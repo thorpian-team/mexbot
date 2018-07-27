@@ -310,7 +310,7 @@ def Backtest(ohlcv,
     percent = percent_of_equity
     capital = initial_capital
 
-    BacktestCore(Open, High, Low, Close, N,
+    BacktestCore(Open.astype(float), High.astype(float), Low.astype(float), Close.astype(float), N,
         buy_entry, sell_entry, buy_exit, sell_exit,
         stop_buy_entry, stop_sell_entry, stop_buy_exit, stop_sell_exit,
         limit_buy_entry, limit_sell_entry, limit_buy_exit, limit_sell_exit,

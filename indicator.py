@@ -398,7 +398,7 @@ def correlation(source_a, source_b, period):
     return source_a.rolling(period).corr(source_b)
 
 def cumsum(source, period):
-    return source.rolling(int(period)).sum()
+    return source.rolling(int(period),min_periods=1).sum()
 
 if __name__ == '__main__':
 
