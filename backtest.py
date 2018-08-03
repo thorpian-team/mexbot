@@ -190,15 +190,12 @@ def BacktestCore(Open, High, Low, Close, N,
                 # 損切判定
                 StopPrice = buyExecPrice - stop_loss[i-1]
                 if Low[i] <= StopPrice:
-                    if Open[i] >= StopPrice:
-                        ClosePrice = StopPrice
-                    else:
-                        ClosePrice = Open[i]
-            elif take_profit[i-1] > 0:
+                    ClosePrice = Close[i]
+            if take_profit[i-1] > 0:
                 # 利確判定
                 LimitPrice = buyExecPrice + take_profit[i-1]
                 if High[i] >= LimitPrice:
-                    ClosePrice = LimitPrice
+                    ClosePrice = Close[i]
             if ClosePrice > 0:
                 ClosePrice = ClosePrice - slippage
                 LongTrade[i] = -ClosePrice #買いポジションクローズ
@@ -212,15 +209,12 @@ def BacktestCore(Open, High, Low, Close, N,
                 # 損切判定
                 StopPrice = sellExecPrice + stop_loss[i-1]
                 if High[i] >= StopPrice:
-                    if Open[i] <= StopPrice:
-                        ClosePrice = StopPrice
-                    else:
-                        ClosePrice = Open[i]
-            elif take_profit[i-1] > 0:
+                    ClosePrice = Close[i]
+            if take_profit[i-1] > 0:
                 # 利確判定
                 LimitPrice = sellExecPrice - take_profit[i-1]
                 if Low[i] <= LimitPrice:
-                    ClosePrice = LimitPrice
+                    ClosePrice = Close[i]
             if ClosePrice > 0:
                 ClosePrice = ClosePrice + slippage
                 ShortTrade[i] = -ClosePrice #売りポジションクローズ
