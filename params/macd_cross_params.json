@@ -7,10 +7,10 @@
 		"logfilename": "macd-cross-xrpm18.log"
 	},
 	"BTC/USD": {
-		"fastlen": 17,
-		"slowlen": 30,
-		"siglen": 18,
-		"percent": 0.4,
+		"fastlen": 19,
+		"slowlen": 27,
+		"siglen": 13,
+		"percent": 1.0,
 		"logfilename": "macd-cross-btcusd.log"
 	}
 }

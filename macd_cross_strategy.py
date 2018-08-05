@@ -18,12 +18,8 @@ def macd_cross_strategy(ticker, ohlcv, position, balance, strategy):
     # エントリー／イグジット
     long_entry = last(crossover(vmacd, vsig))
     short_entry = last(crossunder(vmacd, vsig))
-    if long_entry:
-        side = 'buy'
-    elif short_entry:
-        side = 'sell'
-    else:
-        side = 'none'
+
+    side = 'buy' if long_entry else 'sell' if short_entry else 'none'
     logger.info('MACD {0} Signal {1} Trigger {2}'.format(last(vmacd), last(vsig), side))
 
     # ロット数計算
@@ -48,6 +44,15 @@ def macd_cross_strategy(ticker, ohlcv, position, balance, strategy):
     else:
         strategy.cancel('S')
 
+    # ATRによるドテンロング
+    range = last(atr(ohlcv.close, ohlcv.high, ohlcv.low, 5)) * 1.6
+    stop_sell = int(last(ohlcv.high) + range)
+    logger.info('ATR Range {0} Stop {1}'.format(range, stop_sell))
+
+    if position.currentQty < 0 and not long_entry and not short_entry:
+        strategy.entry('doten L', side='buy', qty=qty_lot, stop=stop_sell)
+    else:
+        strategy.cancel('doten L')
 
 if __name__ == '__main__':
     import argparse
@@ -61,7 +66,7 @@ if __name__ == '__main__':
     strategy.settings.interval = 60
     strategy.settings.apiKey = settings.apiKey
     strategy.settings.secret = settings.secret
-    strategy.testnet.use = True
+    strategy.testnet.use = False
     strategy.testnet.apiKey = settings.testnet_apiKey
     strategy.testnet.secret = settings.testnet_secret
 
