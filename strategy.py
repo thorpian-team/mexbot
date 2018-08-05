@@ -97,6 +97,7 @@ class Strategy:
         self.ohlcv_updated = False
 
         # WebSocket
+        self.settings.use_websocket = False
         self.ws = None
 
         # ログ設定
@@ -471,17 +472,27 @@ class Strategy:
                     sleep(errorWait)
                     errorWait = 0
 
-                # WebSocketの接続が切れていたら再接続
-                self.reconnect_websocket()
+                if self.settings.use_websocket:
+                    # WebSocketの接続が切れていたら再接続
+                    self.reconnect_websocket()
 
-                # ティッカー取得
-                self.ticker = self.fetch_ticker_ws()
+                    # ティッカー取得
+                    self.ticker = self.fetch_ticker_ws()
 
-                # ポジション取得
-                self.position = self.fetch_position_ws()
+                    # ポジション取得
+                    self.position = self.fetch_position_ws()
 
-                # 資金情報取得
-                self.balance = self.fetch_balance_ws()
+                    # 資金情報取得
+                    self.balance = self.fetch_balance_ws()
+                else:
+                    # ティッカー取得
+                    self.ticker = self.fetch_ticker()
+
+                    # ポジション取得
+                    self.position = self.fetch_position()
+
+                    # 資金情報取得
+                    self.balance = self.fetch_balance()
 
                 # 足取得（足確定後取得）
                 self.update_ohlcv(ticker_time=self.ticker.datetime)
