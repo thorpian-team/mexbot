@@ -34,7 +34,7 @@ def macd_cross_backtest(ohlcv, fastlen, slowlen, siglen):
     sell_exit[:ignore] = False
 
     # ゼロラインフィルタ
-    if 1:
+    if 0:
         buy_entry[vsig>0] = False
         sell_entry[vsig<0] = False
 
@@ -48,13 +48,17 @@ def macd_cross_backtest(ohlcv, fastlen, slowlen, siglen):
         buy_exit[vmacd < macd_middle] = False
         sell_exit[vmacd > macd_middle] = False
 
-    # ATRによるSTOP
+    # ATRによるSTOP注文
     if 1:
         range = atr(ohlcv.close, ohlcv.high, ohlcv.low, 5) * 1.6
         stop_buy_entry = ohlcv.high + range
         # stop_sell_entry = ohlcv.low - range
         # stop_buy_exit = ohlcv.low - range
         stop_sell_exit = ohlcv.high + range
+
+        trendsfilter = ohlcv.close < sma(ohlcv.close, 120)
+        stop_buy_entry[trendsfilter] = 0
+        stop_sell_exit[trendsfilter] = 0
 
     # entry_exit = pd.DataFrame({'close':ohlcv.close, 'macd':vmacd, 'sig':vsig, #'fsma':fastsma, 'ssma':slowsma, 'buy_size':buy_size, 'sell_size':sell_size,
     #     'buy_entry':buy_entry, 'buy_exit':buy_exit, 'sell_entry':sell_entry, 'sell_exit':sell_exit})#, index=ohlcv.index)
