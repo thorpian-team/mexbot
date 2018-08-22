@@ -45,7 +45,7 @@ class Strategy:
         '15m': { 'binSize' : '5m', 'resample': True,  'count': 120, 'delta':timedelta(minutes=5) },
         '30m': { 'binSize' : '5m', 'resample': True,  'count': 120, 'delta':timedelta(minutes=5) },
         '45m': { 'binSize' : '5m', 'resample': True,  'count': 120, 'delta':timedelta(minutes=5) },
-         '1h': { 'binSize' : '1h', 'resample': False, 'count': 100, 'delta':timedelta(hours=1)    },
+         '1h': { 'binSize' : '1h', 'resample': False, 'count': 200, 'delta':timedelta(hours=1)    },
          '2h': { 'binSize' : '1h', 'resample': True,  'count': 100, 'delta':timedelta(hours=1)    },
          '4h': { 'binSize' : '1h', 'resample': True,  'count': 100, 'delta':timedelta(hours=1)    },
          '1d': { 'binSize' : '1d', 'resample': False, 'count': 100, 'delta':timedelta(days=1)     },
