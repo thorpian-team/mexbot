@@ -31,7 +31,7 @@ def fastsma(source, period):
 
 def sma(source, period):
     period = int(period)
-    return source.rolling(period).mean()
+    return source.rolling(period,min_periods=1).mean()
 
 def dsma(source, period):
     period = int(period)
@@ -63,11 +63,11 @@ def rma(source, period):
 
 def highest(source, period):
     period = int(period)
-    return source.rolling(period).max()
+    return source.rolling(period,min_periods=1).max()
 
 def lowest(source, period):
     period = int(period)
-    return source.rolling(period).min()
+    return source.rolling(period,min_periods=1).min()
 
 def stdev(source, period):
     period = int(period)
@@ -192,11 +192,22 @@ def last(source, period=0):
     last(close, 0)  現在の足
     last(close, 1)  1つ前の足
     """
-    period = int(period)
-    return source.iat[-1-period]
+    return source.iat[-1-int(period)]
+
+def totuple(source):
+    return tuple(source.values.flatten())
+
+def tolist(source):
+    return list(source.values.flatten())
 
 def change(source, length=1):
     return source.diff(length).fillna(0)
+
+def fallingcnt(source, period):
+    return (source.diff()<0).rolling(period, min_periods=1).sum()
+
+def risingcnt(source, period):
+    return (source.diff()>0).rolling(period, min_periods=1).sum()
 
 def pivothigh(source, leftbars, rightbars):
     leftbars = int(leftbars)
@@ -399,6 +410,12 @@ def correlation(source_a, source_b, period):
 
 def cumsum(source, period):
     return source.rolling(int(period),min_periods=1).sum()
+
+def hlc3(ohlcv):
+    return (ohlcv.high+ohlcv.low+ohlcv.close)/3
+
+def ohlc4(ohlcv):
+    return (ohlcv.open+ohlcv.high+ohlcv.low+ohlcv.close)/4
 
 if __name__ == '__main__':
 
