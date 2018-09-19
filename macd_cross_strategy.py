@@ -55,7 +55,7 @@ def macd_cross_strategy(ticker, ohlcv, position, balance, strategy):
     else:
         stop_price = 0
 
-    if stop_price > 0 and not long_entry and not short_entry:
+    if stop_price > 0 and position.currentQty < 0 and not long_entry and not short_entry:
         strategy.entry('doten L', side='buy', qty=qty_lot, stop=stop_price)
     else:
         strategy.cancel('doten L')
