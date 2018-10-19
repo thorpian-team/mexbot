@@ -411,14 +411,6 @@ def correlation(source_a, source_b, period):
 def cumsum(source, period):
     return source.rolling(int(period),min_periods=1).sum()
 
-def at(source, period=0):
-    period = int(period)
-    return source.iat[-1-period]
-
-def loc(ohlcv, period=0):
-    period = int(period)
-    return ohlcv.iloc[-1-period]
-
 def hlc3(ohlcv):
     return (ohlcv.high+ohlcv.low+ohlcv.close)/3
 
