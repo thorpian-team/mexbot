@@ -293,15 +293,19 @@ def sar(high, low, start, inc, max):
                 sar[i] = ep
     return pd.Series(sar, index=index)
 
-def minimum(a, b, period):
+def minimum(a, b, period=1):
     c = a.copy()
     c[a > b] = b
+    if period < 2:
+        return c
     period = int(period)
     return c.rolling(period).min()
 
-def maximum(a, b, period):
+def maximum(a, b, period=1):
     c = a.copy()
     c[a < b] = b
+    if period < 2:
+        return c
     period = int(period)
     return c.rolling(period).max()
 
