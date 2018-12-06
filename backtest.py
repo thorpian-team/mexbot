@@ -340,7 +340,9 @@ def BacktestCore2(Open, High, Low, Close, Trades, N, YourLogic, LongTrade, LongP
         # 1つ前の足で注文作成
         O, H, L, C = Open[i-1], High[i-1], Low[i-1], Close[i-1]
         PositionSize = sum(p[2]*p[0] for p in Positions)
-        Orders = YourLogic(O,H,L,C,i-1,PositionSize)
+        PositionAvgPrice = sum(p[1] for p in Positions)/len(Positions) if len(Positions) > 0 else 0
+        # print(i,'Pos',PositionAvgPrice,PositionSize)
+        Orders = YourLogic(O,H,L,C,i-1,PositionSize,PositionAvgPrice)
 
         # 注文受付
         for o in Orders:
@@ -358,19 +360,19 @@ def BacktestCore2(Open, High, Low, Close, Trades, N, YourLogic, LongTrade, LongP
         if BuySize > 0:
             ExecPrice = buy_order(BuyPrice==0, BuyPrice, 0, O, H, L, C)
             if ExecPrice > 0:
+                # print(i,'buy',ExecPrice,BuySize)
                 Positions.append([1, ExecPrice, BuySize])
                 LongTrade[i] = ExecPrice
                 BuyPrice = BuySize = 0
-                # print(i,'buy',ExecPrice,BuySize,PositionSize)
 
         # 売り約定
         if SellSize > 0:
             ExecPrice = sell_order(SellPrice==0, SellPrice, 0, O, H, L, C)
             if ExecPrice > 0:
+                # print(i,'sell',ExecPrice,SellSize)
                 Positions.append([-1, ExecPrice, SellSize])
                 ShortTrade[i] = ExecPrice
                 SellPrice = SellSize = 0
-                # print(i,'sell',ExecPrice,SellSize,PositionSize)
 
         # 決済
         while len(Positions)>=2:
@@ -394,12 +396,12 @@ def BacktestCore2(Open, High, Low, Close, Trades, N, YourLogic, LongTrade, LongP
                 # print(i,'close',l[0],l[1],l[2])
                 if l[0] > 0:
                     LongPL[i] = pnl
-                    LongTrade[i] = r[1]
-                    LongPct[i] = LongPL[i] / LongTrade[i]
+                    # LongTrade[i] = r[1]
+                    LongPct[i] = LongPL[i] / r[1]
                 else:
                     ShortPL[i] = pnl
-                    ShortTrade[i] = r[1]
-                    ShortPct[i] = ShortPL[i] / ShortTrade[i]
+                    # ShortTrade[i] = r[1]
+                    ShortPct[i] = ShortPL[i] / r[1]
             else:
                 break
 
