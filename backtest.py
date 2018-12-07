@@ -329,93 +329,108 @@ def BacktestCore(Open, High, Low, Close, Trades, N,
         ShortPct[N-1] = ShortPL[N-1] / sellExecPrice
 
 
-def BacktestCore2(Open, High, Low, Close, Trades, N, YourLogic, LongTrade, LongPL, LongPct, ShortTrade, ShortPL, ShortPct):
+def BacktestCore2(Open, High, Low, Close, Trades, N, YourLogic,
+                  LongTrade, LongPL, LongPct, ShortTrade, ShortPL, ShortPct,
+                  delay_n):
 
-    BuyPrice = BuySize = 0
-    SellPrice = SellSize = 0
-    Positions = deque()
+    positions = deque()
+    position_size = 0
+    position_avg_price = 0
+    remaining_orders = {}
 
-    for i in range(1, N):
+    for i in range(delay_n, N):
 
         # 1つ前の足で注文作成
-        O, H, L, C = Open[i-1], High[i-1], Low[i-1], Close[i-1]
-        PositionSize = sum(p[2]*p[0] for p in Positions)
-        PositionAvgPrice = sum(p[1] for p in Positions)/len(Positions) if len(Positions) > 0 else 0
-        # print(i,'Pos',PositionAvgPrice,PositionSize)
-        Orders = YourLogic(O,H,L,C,i-1,PositionSize,PositionAvgPrice)
+        n = i-delay_n
+        O, H, L, C = Open[n], High[n], Low[n], Close[n]
+        orders = YourLogic(O,H,L,C,n,position_size,position_avg_price)
 
         # 注文受付
-        for o in Orders:
-            if o[0] > 0:
-                BuyPrice = o[1]
-                BuySize = o[2]
-            elif o[0] < 0:
-                SellPrice = o[1]
-                SellSize = o[2]
+        for o in orders:
+            _, _, o_size, o_id = o
+            if o_size>0:
+                remaining_orders[o_id] = o
+            else:
+                if o_id in remaining_orders:
+                    del remaining_orders[o_id]
 
         # 現在の足で約定
         O, H, L, C = Open[i], High[i], Low[i], Close[i]
 
-        # 買い約定
-        if BuySize > 0:
-            ExecPrice = buy_order(BuyPrice==0, BuyPrice, 0, O, H, L, C)
-            if ExecPrice > 0:
-                # print(i,'buy',ExecPrice,BuySize)
-                Positions.append([1, ExecPrice, BuySize])
-                LongTrade[i] = ExecPrice
-                BuyPrice = BuySize = 0
+        # 約定
+        remain = {}
+        for k,o in remaining_orders.items():
+            o_side, o_price, o_size, o_id = o
+            exec_price = 0
 
-        # 売り約定
-        if SellSize > 0:
-            ExecPrice = sell_order(SellPrice==0, SellPrice, 0, O, H, L, C)
-            if ExecPrice > 0:
-                # print(i,'sell',ExecPrice,SellSize)
-                Positions.append([-1, ExecPrice, SellSize])
-                ShortTrade[i] = ExecPrice
-                SellPrice = SellSize = 0
+            if o_side > 0:
+                exec_price = buy_order(o_price==0, o_price, 0, O, H, L, C)
+            elif o_side < 0:
+                exec_price = sell_order(o_price==0, o_price, 0, O, H, L, C)
 
-        # 決済
-        while len(Positions)>=2:
-            l = Positions[0]
-            r = Positions[-1]
-            if l[0] != r[0]:
-                if l[2] >= r[2]:
-                    pnl = (r[1] - l[1]) * (r[2] * l[0])
-                    l[2] = l[2] - r[2]
-                    Positions.pop()
-                    if r[0] > 0:
-                        LongTrade[i] = r[1]
+            if exec_price > 0:
+                positions.append([o_side, exec_price, o_size])
+                # print(i, o_id, o_side, exec_price, o_size)
+                if o_side > 0:
+                    LongTrade[i] = exec_price
+                else:
+                    ShortTrade[i] = exec_price
+
+                # 決済
+                while len(positions)>=2:
+                    l_side, l_price, l_size = positions.popleft()
+                    r_side, r_price, r_size = positions.pop()
+                    if l_side != r_side:
+                        if l_size >= r_size:
+                            pnl = (r_price - l_price) * (r_size * l_side)
+                            c_size = r_size
+                            l_size = l_size - r_size
+                            if l_size > 0:
+                                positions.appendleft((l_side,l_price,l_size))
+                        else:
+                            pnl = (r_price - l_price) * (l_size * l_side)
+                            c_size = l_size
+                            r_size = r_size - l_size
+                            if r_size > 0:
+                                positions.append((r_side,r_price,r_size))
+                        # print(i, 'Close', l_side, l_price, c_size, r_price, pnl)
+                        if l_side > 0:
+                            LongPL[i] = LongPL[i] + pnl
+                            LongTrade[i] = r_price
+                            LongPct[i] = LongPL[i] / r_price
+                        else:
+                            ShortPL[i] = ShortPL[i] + pnl
+                            ShortTrade[i] = r_price
+                            ShortPct[i] = ShortPL[i] / r_price
                     else:
-                        ShortTrade[i] = r[1]
-                    if l[2] <= 0:
-                        Positions.popleft()
+                        break
+
+                # ポジションサイズ計算
+                pos = len(positions)
+                if pos:
+                    position_size = math.fsum(p[2]*p[0] for p in positions)
+                    position_avg_price = math.fsum(p[1] for p in positions) / pos
                 else:
-                    pnl = (r[1] - l[1]) * (l[2] * l[0])
-                    r[2] = r[2] - l[2]
-                    Positions.popleft()
-                # print(i,'close',l[0],l[1],l[2])
-                if l[0] > 0:
-                    LongPL[i] = pnl
-                    # LongTrade[i] = r[1]
-                    LongPct[i] = LongPL[i] / r[1]
-                else:
-                    ShortPL[i] = pnl
-                    # ShortTrade[i] = r[1]
-                    ShortPct[i] = ShortPL[i] / r[1]
+                    position_size = position_avg_price = 0
+                # print(i,'Pos',position_avg_price,position_size)
             else:
-                break
+                remain[o_id] = o
+
+        # 残りの注文
+        remaining_orders = remain
 
     # 残ポジションクローズ
-    if len(Positions):
-        PositionSize = sum(p[2]*p[0] for p in Positions)
-        PositionAvgPrice = sum(p[1] for p in Positions)/len(Positions)
+    if len(positions):
+        position_size = sum(p[2]*p[0] for p in positions)
+        position_avg_price = sum(p[1] for p in positions)/len(positions)
         price = Close[N-1]
-        pnl = (PositionAvgPrice - price) * PositionSize * -1
-        #print(PositionSize,PositionAvgPrice,price,pnl)
-        if PositionSize > 0:
+        pnl = (position_avg_price - price) * position_size * -1
+        if position_size > 0:
+            # print(N-1, 'Close', 1, position_avg_price, position_size, price, pnl)
             LongPL[i] = pnl
             LongTrade[i] = price
-        elif PositionSize < 0:
+        elif position_size < 0:
+            # print(N-1, 'Close', -1, position_avg_price, position_size, price, pnl)
             ShortPL[i] = pnl
             ShortTrade[i] = price
 
@@ -492,8 +507,9 @@ def Backtest(ohlcv,
     capital = initial_capital
 
     if yourlogic:
-        BacktestCore2(Open.astype(float), High.astype(float), Low.astype(float), Close.astype(float), Trades.astype(int), N,
-        yourlogic, LongTrade, LongPL, LongPct, ShortTrade, ShortPL, ShortPct)
+        BacktestCore2(Open.astype(float), High.astype(float), Low.astype(float), Close.astype(float), Trades.astype(int), N, yourlogic,
+        LongTrade, LongPL, LongPct, ShortTrade, ShortPL, ShortPct,
+        int(delay_n+1))
     else:
         BacktestCore(Open.astype(float), High.astype(float), Low.astype(float), Close.astype(float), Trades.astype(int), N,
             buy_entry, sell_entry, buy_exit, sell_exit,
