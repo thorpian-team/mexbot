@@ -120,16 +120,36 @@ def BacktestCore(Open, High, Low, Close, Trades, N,
         # 約定数が規定値を超えていたら注文拒否
         OrderReject = Trades[i] > trades_per_n
 
+        # 新規注文受付
+        if not OrderReject and not EntryReject:
+            # 買い
+            buyMarketEntry = buy_entry[i-delay_n]
+            buyLimitEntry = limit_buy_entry[i-delay_n]
+            buyStopEntry = stop_buy_entry[i-delay_n]
+            buyOpenSize = buy_size[i-delay_n]
+            # 売り
+            sellMarketEntry = sell_entry[i-delay_n]
+            sellLimitEntry = limit_sell_entry[i-delay_n]
+            sellStopEntry = stop_sell_entry[i-delay_n]
+            sellOpenSize = sell_size[i-delay_n]
+
+        # 決済注文受付
+        if not OrderReject:
+            # 買い決済
+            buyMarketExit = buy_exit[i-delay_n]
+            buyLimitExit = limit_buy_exit[i-delay_n]
+            buyStopExit = stop_buy_exit[i-delay_n]
+            buyCloseSize = buy_size[i-delay_n]
+            # 売り決済
+            sellMarketExit = sell_exit[i-delay_n]
+            sellLimitExit = limit_sell_exit[i-delay_n]
+            sellStopExit = stop_sell_exit[i-delay_n]
+            sellCloseSize = sell_size[i-delay_n]
+
         # 買い注文処理
         if buyExecLot < max_buy_size:
             #OpenPrice = buy_order(buy_entry[i-delay_n],limit_buy_entry[i-delay_n],stop_buy_entry[i-delay_n],O,H,L,C)
             OpenPrice = 0
-            # 注文受付
-            if not OrderReject and not EntryReject:
-                buyMarketEntry = buy_entry[i-1]
-                buyLimitEntry = limit_buy_entry[i-1]
-                buyStopEntry = stop_buy_entry[i-1]
-                buyOpenSize = buy_size[i-1]
             # 指値注文
             if buyLimitEntry > 0 and Low[i] <= buyLimitEntry:
                 OpenPrice = buyLimitEntry
@@ -158,12 +178,6 @@ def BacktestCore(Open, High, Low, Close, Trades, N,
         if buyExecLot > 0 and not BuyNow:
             # ClosePrice = sell_order(buy_exit[i-delay_n],limit_buy_exit[i-delay_n],stop_buy_exit[i-delay_n],O,H,L,C)
             ClosePrice = 0
-            # 注文受付
-            if not OrderReject:
-                buyMarketExit = buy_exit[i-delay_n]
-                buyLimitExit = limit_buy_exit[i-delay_n]
-                buyStopExit = stop_buy_exit[i-delay_n]
-                buyCloseSize = buy_size[i-delay_n]
             # 指値注文
             if buyLimitExit > 0 and High[i] >= buyLimitExit:
                 ClosePrice = buyLimitExit
@@ -198,12 +212,6 @@ def BacktestCore(Open, High, Low, Close, Trades, N,
         if sellExecLot < max_sell_size:
             #OpenPrice = sell_order(sell_entry[i-delay_n],limit_sell_entry[i-delay_n],stop_sell_entry[i-delay_n],O,H,L,C)
             OpenPrice = 0
-            # 注文受付
-            if not OrderReject and not EntryReject:
-                sellMarketEntry = sell_entry[i-1]
-                sellLimitEntry = limit_sell_entry[i-1]
-                sellStopEntry = stop_sell_entry[i-1]
-                sellOpenSize = sell_size[i-1]
             # 指値注文
             if sellLimitEntry > 0 and High[i] >= sellLimitEntry:
                 OpenPrice = sellLimitEntry
@@ -232,12 +240,6 @@ def BacktestCore(Open, High, Low, Close, Trades, N,
         if sellExecLot > 0 and not SellNow:
             #ClosePrice = buy_order(sell_exit[i-delay_n],limit_sell_exit[i-delay_n],stop_sell_exit[i-delay_n],O,H,L,C)
             ClosePrice = 0
-            # 注文受付
-            if not OrderReject:
-                sellMarketExit = sell_exit[i-delay_n]
-                sellLimitExit = limit_sell_exit[i-delay_n]
-                sellStopExit = stop_sell_exit[i-delay_n]
-                sellCloseSize = sell_size[i-delay_n]
             # 指値注文
             if sellLimitExit > 0 and Low[i] <= sellLimitExit:
                 ClosePrice = sellLimitExit
@@ -403,6 +405,8 @@ def BacktestCore2(Open, High, Low, Close, Trades, N, YourLogic,
                             ShortTrade[i] = r_price
                             ShortPct[i] = ShortPL[i] / r_price
                     else:
+                        positions.appendleft((l_side,l_price,l_size))
+                        positions.append((r_side,r_price,r_size))
                         break
 
                 # ポジションサイズ計算
