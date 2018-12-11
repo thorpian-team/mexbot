@@ -333,7 +333,7 @@ def BacktestCore(Open, High, Low, Close, Trades, N,
 
 def BacktestCore2(Open, High, Low, Close, Trades, N, YourLogic,
                   LongTrade, LongPL, LongPct, ShortTrade, ShortPL, ShortPct,
-                  delay_n):
+                  delay_n, trades_per_n):
 
     positions = deque()
     position_size = 0
@@ -342,19 +342,23 @@ def BacktestCore2(Open, High, Low, Close, Trades, N, YourLogic,
 
     for i in range(delay_n, N):
 
-        # 1つ前の足で注文作成
-        n = i-delay_n
-        O, H, L, C = Open[n], High[n], Low[n], Close[n]
-        orders = YourLogic(O,H,L,C,n,position_size,position_avg_price)
+        # 約定数が規定値を超えていたら注文拒否
+        order_reject = Trades[i] > trades_per_n
 
-        # 注文受付
-        for o in orders:
-            _, _, o_size, o_id = o
-            if o_size>0:
-                remaining_orders[o_id] = o
-            else:
-                if o_id in remaining_orders:
-                    del remaining_orders[o_id]
+        # 1つ前の足で注文作成
+        if not order_reject:
+            n = i-delay_n
+            O, H, L, C = Open[n], High[n], Low[n], Close[n]
+            orders = YourLogic(O,H,L,C,n,position_size,position_avg_price)
+
+            # 注文受付
+            for o in orders:
+                _, _, o_size, o_id = o
+                if o_size>0:
+                    remaining_orders[o_id] = o
+                else:
+                    if o_id in remaining_orders:
+                        del remaining_orders[o_id]
 
         # 現在の足で約定
         O, H, L, C = Open[i], High[i], Low[i], Close[i]
@@ -398,11 +402,11 @@ def BacktestCore2(Open, High, Low, Close, Trades, N, YourLogic,
                         # print(i, 'Close', l_side, l_price, c_size, r_price, pnl)
                         if l_side > 0:
                             LongPL[i] = LongPL[i] + pnl
-                            LongTrade[i] = r_price
+                            # LongTrade[i] = r_price
                             LongPct[i] = LongPL[i] / r_price
                         else:
                             ShortPL[i] = ShortPL[i] + pnl
-                            ShortTrade[i] = r_price
+                            # ShortTrade[i] = r_price
                             ShortPct[i] = ShortPL[i] / r_price
                     else:
                         positions.appendleft((l_side,l_price,l_size))
@@ -513,7 +517,7 @@ def Backtest(ohlcv,
     if yourlogic:
         BacktestCore2(Open.astype(float), High.astype(float), Low.astype(float), Close.astype(float), Trades.astype(int), N, yourlogic,
         LongTrade, LongPL, LongPct, ShortTrade, ShortPL, ShortPct,
-        int(delay_n+1))
+        int(delay_n+1), int(trades_per_n))
     else:
         BacktestCore(Open.astype(float), High.astype(float), Low.astype(float), Close.astype(float), Trades.astype(int), N,
             buy_entry, sell_entry, buy_exit, sell_exit,
