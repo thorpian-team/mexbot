@@ -48,6 +48,10 @@ def ema(source, period):
     # alpha = 2.0 / (period + 1)
     return source.ewm(span=period).mean()
 
+def nma(source, N, period):
+    alpha = N / (max(period, N) + 1)
+    return source.ewm(alpha=alpha).mean()
+
 def dema(source, period):
     ema = source.ewm(span=period).mean()
     return (ema * 2) - ema.ewm(span=period).mean()
