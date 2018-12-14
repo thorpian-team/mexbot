@@ -332,7 +332,7 @@ def BacktestCore(Open, High, Low, Close, Trades, N,
 
 
 def BacktestCore2(Open, High, Low, Close, Trades, N, YourLogic,
-                  LongTrade, LongPL, LongPct, ShortTrade, ShortPL, ShortPct,
+                  LongTrade, LongPL, LongPct, ShortTrade, ShortPL, ShortPct, PositionSize,
                   delay_n, trades_per_n):
 
     positions = deque()
@@ -390,13 +390,13 @@ def BacktestCore2(Open, High, Low, Close, Trades, N, YourLogic,
                         if l_size >= r_size:
                             pnl = (r_price - l_price) * (r_size * l_side)
                             c_size = r_size
-                            l_size = l_size - r_size
+                            l_size = round(l_size-r_size,8)
                             if l_size > 0:
                                 positions.appendleft((l_side,l_price,l_size))
                         else:
                             pnl = (r_price - l_price) * (l_size * l_side)
                             c_size = l_size
-                            r_size = r_size - l_size
+                            r_size = round(r_size-l_size,8)
                             if r_size > 0:
                                 positions.append((r_side,r_price,r_size))
                         # print(i, 'Close', l_side, l_price, c_size, r_price, pnl)
@@ -423,6 +423,9 @@ def BacktestCore2(Open, High, Low, Close, Trades, N, YourLogic,
                 # print(i,'Pos',position_avg_price,position_size)
             else:
                 remain[o_id] = o
+
+        # ポジション情報保存
+        PositionSize[i] = position_size
 
         # 残りの注文
         remaining_orders = remain
@@ -470,6 +473,8 @@ def Backtest(ohlcv,
     LongPct = np.zeros(N) # 買いポジションの損益率
     ShortPct = np.zeros(N) # 売りポジションの損益率
 
+    PositionSize = np.zeros(N) # ポジション情報
+
     place_holder = np.zeros(N) # プレースホルダ
     bool_place_holder = np.zeros(N, dtype=np.bool) # プレースホルダ
     if isinstance(buy_size, pd.Series):
@@ -516,7 +521,7 @@ def Backtest(ohlcv,
 
     if yourlogic:
         BacktestCore2(Open.astype(float), High.astype(float), Low.astype(float), Close.astype(float), Trades.astype(int), N, yourlogic,
-        LongTrade, LongPL, LongPct, ShortTrade, ShortPL, ShortPct,
+        LongTrade, LongPL, LongPct, ShortTrade, ShortPL, ShortPct, PositionSize,
         int(delay_n+1), int(trades_per_n))
     else:
         BacktestCore(Open.astype(float), High.astype(float), Low.astype(float), Close.astype(float), Trades.astype(int), N,
@@ -532,6 +537,7 @@ def Backtest(ohlcv,
         'LongTrade':LongTrade, 'ShortTrade':ShortTrade,
         'LongPL':LongPL, 'ShortPL':ShortPL,
         'LongPct':LongPct, 'ShortPct':ShortPct,
+        'PositionSize':PositionSize,
         }, index=ohlcv.index))
 
 
