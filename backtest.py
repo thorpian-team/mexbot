@@ -92,14 +92,14 @@ def calclots(capital, price, percent, lot):
     f8[:],f8[:],f8[:],f8[:],
     f8[:],f8[:],f8,f8,
     f8,f8,f8,f8,f8,f8,f8,i8,i8,f8,i8,
-    f8[:],f8[:],f8[:],f8[:],f8[:],f8[:]), nopython=True)
+    f8[:],f8[:],f8[:],f8[:],f8[:],f8[:],f8[:]), nopython=True)
 def BacktestCore(Open, High, Low, Close, Trades, N,
     buy_entry, sell_entry, buy_exit, sell_exit,
     stop_buy_entry, stop_sell_entry, stop_buy_exit, stop_sell_exit,
     limit_buy_entry, limit_sell_entry, limit_buy_exit, limit_sell_exit,
     buy_size, sell_size, max_buy_size, max_sell_size,
     spread, take_profit, stop_loss, trailing_stop, slippage, percent, capital, trades_per_n, delay_n, max_drawdown, wait_n_for_mdd,
-    LongTrade, LongPL, LongPct, ShortTrade, ShortPL, ShortPct):
+    LongTrade, LongPL, LongPct, ShortTrade, ShortPL, ShortPct, PositionSize):
 
     buyExecPrice = sellExecPrice = 0.0 # 売買価格
     buyMarketEntry = buyMarketExit = sellMarketEntry = sellMarketExit = 0
@@ -317,6 +317,7 @@ def BacktestCore(Open, High, Low, Close, Trades, N,
         if max_drawdown>0 and dd>max_drawdown:
             dd_wait = wait_n_for_mdd
             max_profit = capital
+        PositionSize[i] = buyExecLot - sellExecLot
 
     # ポジションクローズ
     if buyExecPrice > 0:
@@ -531,7 +532,7 @@ def Backtest(ohlcv,
             buy_size, sell_size, max_buy_size, max_sell_size,
             float(spread), float(take_profit), float(stop_loss), float(trailing_stop), float(slippage), float(percent), float(capital), int(trades_per_n), int(delay_n+1),
             float(max_drawdown), int(wait_n_for_mdd),
-            LongTrade, LongPL, LongPct, ShortTrade, ShortPL, ShortPct)
+            LongTrade, LongPL, LongPct, ShortTrade, ShortPL, ShortPct, PositionSize)
 
     return BacktestReport(pd.DataFrame({
         'LongTrade':LongTrade, 'ShortTrade':ShortTrade,
