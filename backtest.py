@@ -21,7 +21,10 @@ def buy_order(market, limit, stop, O, H, L, C):
             exec_price = O
     # 指値注文
     elif limit > 0 and L <= limit:
-        exec_price = limit
+        if limit > O:
+            exec_price = H
+        else:
+            exec_price = limit
     # 成行注文
     elif market:
         exec_price = O
@@ -54,7 +57,10 @@ def sell_order(market, limit, stop, O, H, L, C):
             exec_price = O
     # 指値注文
     elif limit > 0 and H >= limit:
-        exec_price = limit
+        if limit < O:
+            exec_price = L
+        else:
+            exec_price = limit
     # 成行注文
     elif market:
         exec_price = O
@@ -338,6 +344,7 @@ def BacktestCore2(Open, High, Low, Close, Trades, N, YourLogic,
     positions = deque()
     position_size = 0
     position_avg_price = 0
+    netprofit = 0
     remaining_orders = {}
 
     for i in range(delay_n, N):
@@ -349,15 +356,17 @@ def BacktestCore2(Open, High, Low, Close, Trades, N, YourLogic,
         if not order_reject:
             n = i-delay_n
             O, H, L, C = Open[n], High[n], Low[n], Close[n]
-            orders = YourLogic(O,H,L,C,n,position_size,position_avg_price)
+            orders = YourLogic(O,H,L,C,n,position_size=position_size,position_avg_price=position_avg_price,netprofit=netprofit)
 
             # 注文受付
             for o in orders:
-                _, _, o_size, o_id = o
+                o_side, o_price, o_size, o_id = o
                 if o_size>0:
                     remaining_orders[o_id] = o
+                    # print(i, 'Open', o_id, o_side, o_price, o_size)
                 else:
                     if o_id in remaining_orders:
+                        # print(i, 'Cancel', o_id)
                         del remaining_orders[o_id]
 
         # 現在の足で約定
@@ -376,7 +385,7 @@ def BacktestCore2(Open, High, Low, Close, Trades, N, YourLogic,
 
             if exec_price > 0:
                 positions.append([o_side, exec_price, o_size])
-                # print(i, o_id, o_side, exec_price, o_size)
+                # print(i, 'Exec', o_id, o_side, exec_price, o_size)
                 if o_side > 0:
                     LongTrade[i] = exec_price
                 else:
@@ -430,6 +439,9 @@ def BacktestCore2(Open, High, Low, Close, Trades, N, YourLogic,
         # 残りの注文
         remaining_orders = remain
 
+        # 合計損益
+        netprofit = netprofit + LongPL[i] + ShortPL[i]
+
     # 残ポジションクローズ
     if len(positions):
         position_size = sum(p[2]*p[0] for p in positions)
@@ -451,7 +463,7 @@ def Backtest(ohlcv,
     stop_buy_entry=None, stop_sell_entry=None, stop_buy_exit=None, stop_sell_exit=None,
     limit_buy_entry=None, limit_sell_entry=None, limit_buy_exit=None, limit_sell_exit=None,
     buy_size=1.0, sell_size=1.0, max_buy_size=1.0, max_sell_size=1.0,
-    spread=0, take_profit=0, stop_loss=0, trailing_stop=0, slippage=0, percent_of_equity=0.0, initial_capital=0.0, trades_per_seconds = 0, delay_n = 0,
+    spread=0, take_profit=0, stop_loss=0, trailing_stop=0, slippage=0, percent_of_equity=0.0, initial_capital=0.0, trades_per_second = 0, delay_n = 0,
     max_drawdown=0, wait_seconds_for_mdd=0, yourlogic=None,
     **kwargs):
     Open = ohlcv.open.values #始値
@@ -508,7 +520,7 @@ def Backtest(ohlcv,
 
     # 約定数
     Trades = place_holder
-    trades_per_n = trades_per_seconds * (ohlcv.index[1] - ohlcv.index[0]).total_seconds()
+    trades_per_n = trades_per_second * (ohlcv.index[1] - ohlcv.index[0]).total_seconds()
     if trades_per_n:
         if 'trades' in ohlcv:
             Trades = ohlcv.trades.values
