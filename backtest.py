@@ -426,8 +426,9 @@ def BacktestCore2(Open, High, Low, Close, Trades, N, YourLogic,
                 # ポジションサイズ計算
                 pos = len(positions)
                 if pos:
-                    position_size = math.fsum(p[2]*p[0] for p in positions)
-                    position_avg_price = math.fsum(p[1] for p in positions) / pos
+                    position_size = math.fsum(p[2] for p in positions)
+                    position_avg_price = math.fsum(p[1]*p[2] for p in positions) / position_size
+                    position_size = position_size * positions[0][0]
                 else:
                     position_size = position_avg_price = 0
                 # print(i,'Pos',position_avg_price,position_size)
