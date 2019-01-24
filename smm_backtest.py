@@ -25,7 +25,7 @@ def simple_market_make_backtest(ohlcv):
 
     def smm_logic2(O, H, L, C, n, position_size, **others):
         orders = []
-        pairs = [(0.01, 50), (0.02, 100), (0.04, 200)]
+        pairs = [(0.03, 200), (0.02, 100), (0.01, 50)]
         maxsize = sum(p[0] for p in pairs)
         buymax = sellmax = position_size
         for pair in pairs:
