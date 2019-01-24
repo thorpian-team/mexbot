@@ -21,10 +21,7 @@ def buy_order(market, limit, stop, O, H, L, C):
             exec_price = O
     # 指値注文
     elif limit > 0 and L <= limit:
-        if limit > O:
-            exec_price = H
-        else:
-            exec_price = limit
+        exec_price = limit
     # 成行注文
     elif market:
         exec_price = O
@@ -57,10 +54,7 @@ def sell_order(market, limit, stop, O, H, L, C):
             exec_price = O
     # 指値注文
     elif limit > 0 and H >= limit:
-        if limit < O:
-            exec_price = L
-        else:
-            exec_price = limit
+        exec_price = limit
     # 成行注文
     elif market:
         exec_price = O
