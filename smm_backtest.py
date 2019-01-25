@@ -8,11 +8,12 @@ def simple_market_make_backtest(ohlcv):
 
     def smm_logic1(O, H, L, C, n, position_size, **others):
         orders = []
-        maxsize = 0.05
-        buysize = sellsize = 0.025
-        spr = C * 0.00225
-        buy = C - spr/2
-        sell = C + spr/2
+        maxsize = 0.1
+        buysize = sellsize = 0.1
+        spr = ohlcv.stdev[n]*2.5
+        mid = (C+H+L)/3
+        buy = mid - spr/2
+        sell = mid + spr/2
         if position_size < maxsize:
             orders.append((+1, buy, buysize, 'L'))
         else:
@@ -28,16 +29,17 @@ def simple_market_make_backtest(ohlcv):
         pairs = [(0.03, 200), (0.02, 100), (0.01, 50)]
         maxsize = sum(p[0] for p in pairs)
         buymax = sellmax = position_size
+        mid = (C+H+L)/3
         for pair in pairs:
             suffix = str(pair[1])
             buymax += pair[0]
             sellmax -= pair[0]
-            if buymax < maxsize:
-                orders.append((+1, C-pair[1], pair[0], 'L'+suffix))
+            if buymax <= maxsize:
+                orders.append((+1, mid-pair[1], pair[0], 'L'+suffix))
             else:
                 orders.append((0, 0, 0, 'L'+suffix))
-            if sellmax > -maxsize:
-                orders.append((-1, C+pair[1], pair[0], 'S'+suffix))
+            if sellmax >= -maxsize:
+                orders.append((-1, mid+pair[1], pair[0], 'S'+suffix))
             else:
                 orders.append((0, 0, 0, 'S'+suffix))
         return orders
