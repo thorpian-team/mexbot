@@ -91,14 +91,15 @@ def calclots(capital, price, percent, lot):
     f8[:],f8[:],f8[:],f8[:],
     f8[:],f8[:],f8[:],f8[:],
     f8[:],f8[:],f8,f8,
-    f8,f8,f8,f8,f8,f8,f8,i8,i8,f8,i8,
+    f8,f8,f8,f8,f8,f8,f8,i8,i8,i8,f8,i8,
     f8[:],f8[:],f8[:],f8[:],f8[:],f8[:],f8[:]), nopython=True)
 def BacktestCore(Open, High, Low, Close, Trades, N,
     buy_entry, sell_entry, buy_exit, sell_exit,
     stop_buy_entry, stop_sell_entry, stop_buy_exit, stop_sell_exit,
     limit_buy_entry, limit_sell_entry, limit_buy_exit, limit_sell_exit,
     buy_size, sell_size, max_buy_size, max_sell_size,
-    spread, take_profit, stop_loss, trailing_stop, slippage, percent, capital, trades_per_n, delay_n, max_drawdown, wait_n_for_mdd,
+    spread, take_profit, stop_loss, trailing_stop, slippage, percent, capital,
+    trades_per_n, delay_n, order_restrict_n, max_drawdown, wait_n_for_mdd,
     LongTrade, LongPL, LongPct, ShortTrade, ShortPL, ShortPct, PositionSize):
 
     buyExecPrice = sellExecPrice = 0.0 # 売買価格
@@ -106,10 +107,11 @@ def BacktestCore(Open, High, Low, Close, Trades, N,
     buyStopEntry = buyStopExit = sellStopEntry = sellStopExit = 0
     buyLimitEntry = buyLimitExit = sellLimitEntry = sellLimitExit = 0
     buyExecLot = sellExecLot = 0
+    buyEntryAcceptN = sellEntryAcceptN = buyExitAcceptN = sellExitAcceptN =0
     dd = max_profit = dd_wait = 0
 
-    for i in range(delay_n, N):
-        # O, H, L, C = Open[i], High[i], Low[i], Close[i]
+    for n in range(delay_n, N):
+        # O, H, L, C = Open[n], High[n], Low[n], Close[n]
         BuyNow = SellNow = False
 
         # ドローダウンが最大値を超えていたら一定時間取引停止
@@ -118,57 +120,39 @@ def BacktestCore(Open, High, Low, Close, Trades, N,
             dd_wait = dd_wait - 1
 
         # 約定数が規定値を超えていたら注文拒否
-        OrderReject = Trades[i] > trades_per_n
-
-        # 新規注文受付
-        if not OrderReject and not EntryReject:
-            # 買い
-            buyMarketEntry = buy_entry[i-delay_n]
-            buyLimitEntry = limit_buy_entry[i-delay_n]
-            buyStopEntry = stop_buy_entry[i-delay_n]
-            buyOpenSize = buy_size[i-delay_n]
-            # 売り
-            sellMarketEntry = sell_entry[i-delay_n]
-            sellLimitEntry = limit_sell_entry[i-delay_n]
-            sellStopEntry = stop_sell_entry[i-delay_n]
-            sellOpenSize = sell_size[i-delay_n]
-
-        # 決済注文受付
-        if not OrderReject:
-            # 買い決済
-            buyMarketExit = buy_exit[i-delay_n]
-            buyLimitExit = limit_buy_exit[i-delay_n]
-            buyStopExit = stop_buy_exit[i-delay_n]
-            buyCloseSize = buy_size[i-delay_n]
-            # 売り決済
-            sellMarketExit = sell_exit[i-delay_n]
-            sellLimitExit = limit_sell_exit[i-delay_n]
-            sellStopExit = stop_sell_exit[i-delay_n]
-            sellCloseSize = sell_size[i-delay_n]
+        OrderReject = (trades_per_n and Trades[n] > trades_per_n)
 
         # 買い注文処理
         if buyExecLot < max_buy_size:
-            #OpenPrice = buy_order(buy_entry[i-delay_n],limit_buy_entry[i-delay_n],stop_buy_entry[i-delay_n],O,H,L,C)
+            # 新規注文受付
+            if not OrderReject and not EntryReject:
+                if n>buyEntryAcceptN+order_restrict_n:
+                    buyMarketEntry = buy_entry[n-delay_n]
+                    buyLimitEntry = limit_buy_entry[n-delay_n]
+                    buyStopEntry = stop_buy_entry[n-delay_n]
+                    buyOpenSize = buy_size[n-delay_n]
+                    if buyMarketEntry>0 or buyLimitEntry>0 or buyStopEntry>0:
+                        buyEntryAcceptN = n
             OpenPrice = 0
             # 指値注文
-            if buyLimitEntry > 0 and Low[i] <= buyLimitEntry:
+            if buyLimitEntry > 0 and Low[n] <= buyLimitEntry:
                 OpenPrice = buyLimitEntry
                 buyLimitEntry = 0
             # STOP注文
-            if buyStopEntry > 0 and High[i] >= buyStopEntry:
-                if Open[i] <= buyStopEntry:
+            if buyStopEntry > 0 and High[n] >= buyStopEntry:
+                if Open[n] <= buyStopEntry:
                     OpenPrice = buyStopEntry
                 else:
-                    OpenPrice = Open[i]
+                    OpenPrice = Open[n]
                 buyStopEntry = 0
             # 成行注文
             if buyMarketEntry > 0:
-                OpenPrice = Open[i]
+                OpenPrice = Open[n]
                 buyMarketEntry = 0
             # 注文執行
             if OpenPrice > 0:
                 execPrice = OpenPrice + spread + slippage
-                LongTrade[i] = execPrice #買いポジションオープン
+                LongTrade[n] = execPrice #買いポジションオープン
                 execLot =  calclots(capital, OpenPrice, percent, buyOpenSize)
                 buyExecPrice = ((execPrice*execLot)+(buyExecPrice*buyExecLot))/(buyExecLot+execLot)
                 buyExecLot = buyExecLot + execLot
@@ -176,22 +160,30 @@ def BacktestCore(Open, High, Low, Close, Trades, N,
 
         # 買い手仕舞い
         if buyExecLot > 0 and not BuyNow:
-            # ClosePrice = sell_order(buy_exit[i-delay_n],limit_buy_exit[i-delay_n],stop_buy_exit[i-delay_n],O,H,L,C)
+            # 決済注文受付
+            if not OrderReject:
+                if n>buyExitAcceptN+order_restrict_n:
+                    buyMarketExit = buy_exit[n-delay_n]
+                    buyLimitExit = limit_buy_exit[n-delay_n]
+                    buyStopExit = stop_buy_exit[n-delay_n]
+                    buyCloseSize = buy_size[n-delay_n]
+                    if buyMarketExit>0 or buyLimitExit>0 or buyStopExit>0:
+                        buyExitAcceptN = n
             ClosePrice = 0
             # 指値注文
-            if buyLimitExit > 0 and High[i] >= buyLimitExit:
+            if buyLimitExit > 0 and High[n] >= buyLimitExit:
                 ClosePrice = buyLimitExit
                 buyLimitExit = 0
             # STOP注文
-            if buyStopExit > 0 and Low[i] <= buyStopExit:
-                if Open[i] >= buyStopExit:
+            if buyStopExit > 0 and Low[n] <= buyStopExit:
+                if Open[n] >= buyStopExit:
                     ClosePrice = buyStopExit
                 else:
-                    ClosePrice = Open[i]
+                    ClosePrice = Open[n]
                 buyStopExit = 0
             # 成行注文
             if buyMarketExit > 0:
-                ClosePrice = Open[i]
+                ClosePrice = Open[n]
                 buyMarketExit = 0
             # 注文執行
             if ClosePrice > 0:
@@ -204,33 +196,41 @@ def BacktestCore(Open, High, Low, Close, Trades, N,
                     buy_exec_price = buyExecPrice
                     buyExecPrice = buyExecLot = 0
                 ClosePrice = ClosePrice - slippage
-                LongTrade[i] = ClosePrice #買いポジションクローズ
-                LongPL[i] = (ClosePrice - buy_exec_price) * buy_exit_lot #損益確定
-                LongPct[i] = LongPL[i] / buy_exec_price
+                LongTrade[n] = ClosePrice #買いポジションクローズ
+                LongPL[n] = (ClosePrice - buy_exec_price) * buy_exit_lot #損益確定
+                LongPct[n] = LongPL[n] / buy_exec_price
 
         # 売り注文処理
         if sellExecLot < max_sell_size:
-            #OpenPrice = sell_order(sell_entry[i-delay_n],limit_sell_entry[i-delay_n],stop_sell_entry[i-delay_n],O,H,L,C)
+            # 新規注文受付
+            if not OrderReject and not EntryReject:
+                if n>sellEntryAcceptN+order_restrict_n:
+                    sellMarketEntry = sell_entry[n-delay_n]
+                    sellLimitEntry = limit_sell_entry[n-delay_n]
+                    sellStopEntry = stop_sell_entry[n-delay_n]
+                    sellOpenSize = sell_size[n-delay_n]
+                    if sellMarketEntry>0 or sellLimitEntry>0 or sellStopEntry>0:
+                        sellEntryAcceptN = n
             OpenPrice = 0
             # 指値注文
-            if sellLimitEntry > 0 and High[i] >= sellLimitEntry:
+            if sellLimitEntry > 0 and High[n] >= sellLimitEntry:
                 OpenPrice = sellLimitEntry
                 sellLimitEntry = 0
             # STOP注文
-            if sellStopEntry > 0 and Low[i] <= sellStopEntry:
-                if Open[i] >= sellStopEntry:
+            if sellStopEntry > 0 and Low[n] <= sellStopEntry:
+                if Open[n] >= sellStopEntry:
                     OpenPrice = sellStopEntry
                 else:
-                    OpenPrice = Open[i]
+                    OpenPrice = Open[n]
                 sellStopEntry = 0
             # 成行注文
             if sellMarketEntry > 0:
-                OpenPrice = Open[i]
+                OpenPrice = Open[n]
                 sellMarketEntry = 0
             # 注文執行
             if OpenPrice:
                 execPrice = OpenPrice - slippage
-                ShortTrade[i] = execPrice #売りポジションオープン
+                ShortTrade[n] = execPrice #売りポジションオープン
                 execLot = calclots(capital,OpenPrice,percent,sellOpenSize)
                 sellExecPrice = ((execPrice*execLot)+(sellExecPrice*sellExecLot))/(sellExecLot+execLot)
                 sellExecLot = sellExecLot + execLot
@@ -238,22 +238,30 @@ def BacktestCore(Open, High, Low, Close, Trades, N,
 
         # 売り手仕舞い
         if sellExecLot > 0 and not SellNow:
-            #ClosePrice = buy_order(sell_exit[i-delay_n],limit_sell_exit[i-delay_n],stop_sell_exit[i-delay_n],O,H,L,C)
+            # 決済注文受付
+            if not OrderReject:
+                if n>sellExitAcceptN+order_restrict_n:
+                    sellMarketExit = sell_exit[n-delay_n]
+                    sellLimitExit = limit_sell_exit[n-delay_n]
+                    sellStopExit = stop_sell_exit[n-delay_n]
+                    sellCloseSize = sell_size[n-delay_n]
+                    if sellMarketExit>0 or sellLimitExit>0 or sellStopExit>0:
+                        sellExitAcceptN = n
             ClosePrice = 0
             # 指値注文
-            if sellLimitExit > 0 and Low[i] <= sellLimitExit:
+            if sellLimitExit > 0 and Low[n] <= sellLimitExit:
                 ClosePrice = sellLimitExit
                 sellLimitExit = 0
             # STOP注文
-            if sellStopExit > 0 and High[i] >= sellStopExit:
-                if Open[i] <= sellStopExit:
+            if sellStopExit > 0 and High[n] >= sellStopExit:
+                if Open[n] <= sellStopExit:
                     ClosePrice = sellStopExit
                 else:
-                    ClosePrice = Open[i]
+                    ClosePrice = Open[n]
                 sellStopExit = 0
             # 成行注文
             if sellMarketExit > 0:
-                ClosePrice = Open[i]
+                ClosePrice = Open[n]
                 sellMarketExit = 0
             # 注文執行
             if ClosePrice > 0:
@@ -266,58 +274,56 @@ def BacktestCore(Open, High, Low, Close, Trades, N,
                     sell_exec_price = sellExecPrice
                     sellExecPrice = sellExecLot = 0
                 ClosePrice = ClosePrice + spread + slippage
-                ShortTrade[i] = ClosePrice #売りポジションクローズ
-                ShortPL[i] = (sell_exec_price - ClosePrice) * sell_exit_lot #損益確定
-                ShortPct[i] = ShortPL[i] / sell_exec_price
+                ShortTrade[n] = ClosePrice #売りポジションクローズ
+                ShortPL[n] = (sell_exec_price - ClosePrice) * sell_exit_lot #損益確定
+                ShortPct[n] = ShortPL[n] / sell_exec_price
 
         # 利確 or 損切によるポジションの決済(エントリーと同じ足で決済しない)
         if buyExecPrice > 0 and not BuyNow and not OrderReject:
-            # ClosePrice = buy_close(take_profit,stop_loss,O,H,L,C)
             ClosePrice = 0
             if stop_loss > 0:
                 # 損切判定
                 StopPrice = buyExecPrice - stop_loss
-                if Low[i] <= StopPrice:
-                    ClosePrice = Close[i]
+                if Low[n] <= StopPrice:
+                    ClosePrice = Close[n]
             if take_profit > 0:
                 # 利確判定
                 LimitPrice = buyExecPrice + take_profit
-                if High[i] >= LimitPrice:
-                    ClosePrice = Close[i]
+                if High[n] >= LimitPrice:
+                    ClosePrice = Close[n]
             if ClosePrice > 0:
                 ClosePrice = ClosePrice - slippage
-                LongTrade[i] = ClosePrice #買いポジションクローズ
-                LongPL[i] = (ClosePrice - buyExecPrice) * buyExecLot #損益確定
-                LongPct[i] = LongPL[i] / buyExecPrice
+                LongTrade[n] = ClosePrice #買いポジションクローズ
+                LongPL[n] = (ClosePrice - buyExecPrice) * buyExecLot #損益確定
+                LongPct[n] = LongPL[n] / buyExecPrice
                 buyExecPrice = buyExecLot = 0
 
         if sellExecPrice > 0 and not SellNow and not OrderReject:
-            # ClosePrice = sell_close(take_profit,stop_loss,O,H,L,C)
             ClosePrice = 0
             if stop_loss > 0:
                 # 損切判定
                 StopPrice = sellExecPrice + stop_loss
-                if High[i] >= StopPrice:
-                    ClosePrice = Close[i]
+                if High[n] >= StopPrice:
+                    ClosePrice = Close[n]
             if take_profit > 0:
                 # 利確判定
                 LimitPrice = sellExecPrice - take_profit
-                if Low[i] <= LimitPrice:
-                    ClosePrice = Close[i]
+                if Low[n] <= LimitPrice:
+                    ClosePrice = Close[n]
             if ClosePrice > 0:
                 ClosePrice = ClosePrice + slippage
-                ShortTrade[i] = ClosePrice #売りポジションクローズ
-                ShortPL[i] = (sellExecPrice - ClosePrice) * sellExecLot #損益確定
-                ShortPct[i] = ShortPL[i] / sellExecPrice
+                ShortTrade[n] = ClosePrice #売りポジションクローズ
+                ShortPL[n] = (sellExecPrice - ClosePrice) * sellExecLot #損益確定
+                ShortPct[n] = ShortPL[n] / sellExecPrice
                 sellExecPrice = sellExecLot = 0
 
-        capital = capital + ShortPL[i] + LongPL[i]
+        capital = capital + ShortPL[n] + LongPL[n]
         max_profit = max(capital, max_profit)
         dd = max_profit - capital
         if max_drawdown>0 and dd>max_drawdown:
             dd_wait = wait_n_for_mdd
             max_profit = capital
-        PositionSize[i] = buyExecLot - sellExecLot
+        PositionSize[n] = buyExecLot - sellExecLot
 
     # ポジションクローズ
     if buyExecPrice > 0:
@@ -342,49 +348,74 @@ def BacktestCore2(Open, High, Low, Close, Trades, N, YourLogic,
     netprofit = 0
     remaining_orders = {}
 
-    for i in range(delay_n, N):
+    for n in range(delay_n, N):
 
         # 約定数が規定値を超えていたら注文拒否
-        order_reject = Trades[i] > trades_per_n
+        order_reject = trades_per_n and Trades[n] > trades_per_n
 
         # 1つ前の足で注文作成
         if not order_reject:
-            n = i-delay_n
-            O, H, L, C = Open[n], High[n], Low[n], Close[n]
-            orders = YourLogic(O,H,L,C,n,position_size=position_size,position_avg_price=position_avg_price,netprofit=netprofit)
+            prev_n = n-delay_n
+            O, H, L, C = Open[prev_n], High[prev_n], Low[prev_n], Close[prev_n]
+            orders = YourLogic(O,H,L,C,prev_n,position_size=position_size,position_avg_price=position_avg_price,netprofit=netprofit)
 
             # 注文受付
             for o in orders:
                 o_side, o_price, o_size, o_id = o
                 if o_size>0:
                     remaining_orders[o_id] = o
-                    # print(i, 'Open', o_id, o_side, o_price, o_size)
+                    # print(n, 'Open', o_id, o_side, o_price, o_size)
                 else:
                     if o_id in remaining_orders:
-                        # print(i, 'Cancel', o_id)
+                        # print(n, 'Cancel', o_id)
                         del remaining_orders[o_id]
 
         # 現在の足で約定
-        O, H, L, C = Open[i], High[i], Low[i], Close[i]
+        O, H, L, C = Open[n], High[n], Low[n], Close[n]
 
         # 約定
         remain = {}
         for k,o in remaining_orders.items():
             o_side, o_price, o_size, o_id = o
-            exec_price = 0
 
+            exec_price = 0
+            market = o_price==0
+            limit = o_price
+            stop = 0
             if o_side > 0:
-                exec_price = buy_order(o_price==0, o_price, 0, O, H, L, C)
+                # STOP注文
+                if stop > 0 and H >= stop:
+                    if stop >= O:
+                        exec_price = stop
+                    else:
+                        exec_price = O
+                # 指値注文
+                elif limit > 0 and L <= limit:
+                    exec_price = limit
+                # 成行注文
+                elif market:
+                    exec_price = O
             elif o_side < 0:
-                exec_price = sell_order(o_price==0, o_price, 0, O, H, L, C)
+                # STOP注文
+                if stop > 0 and L <= stop:
+                    if stop <= O:
+                        exec_price = stop
+                    else:
+                        exec_price = O
+                # 指値注文
+                elif limit > 0 and H >= limit:
+                    exec_price = limit
+                # 成行注文
+                elif market:
+                    exec_price = O
 
             if exec_price > 0:
                 positions.append([o_side, exec_price, o_size])
-                # print(i, 'Exec', o_id, o_side, exec_price, o_size)
+                # print(n, 'Exec', o_id, o_side, exec_price, o_size)
                 if o_side > 0:
-                    LongTrade[i] = exec_price
+                    LongTrade[n] = exec_price
                 else:
-                    ShortTrade[i] = exec_price
+                    ShortTrade[n] = exec_price
 
                 # 決済
                 while len(positions)>=2:
@@ -403,15 +434,15 @@ def BacktestCore2(Open, High, Low, Close, Trades, N, YourLogic,
                             r_size = round(r_size-l_size,8)
                             if r_size > 0:
                                 positions.append((r_side,r_price,r_size))
-                        # print(i, 'Close', l_side, l_price, c_size, r_price, pnl)
+                        # print(n, 'Close', l_side, l_price, c_size, r_price, pnl)
                         if l_side > 0:
-                            LongPL[i] = LongPL[i] + pnl
-                            # LongTrade[i] = r_price
-                            LongPct[i] = LongPL[i] / r_price
+                            LongPL[n] = LongPL[n] + pnl
+                            # LongTrade[n] = r_price
+                            LongPct[n] = LongPL[n] / r_price
                         else:
-                            ShortPL[i] = ShortPL[i] + pnl
-                            # ShortTrade[i] = r_price
-                            ShortPct[i] = ShortPL[i] / r_price
+                            ShortPL[n] = ShortPL[n] + pnl
+                            # ShortTrade[n] = r_price
+                            ShortPct[n] = ShortPL[n] / r_price
                     else:
                         positions.appendleft((l_side,l_price,l_size))
                         positions.append((r_side,r_price,r_size))
@@ -425,33 +456,33 @@ def BacktestCore2(Open, High, Low, Close, Trades, N, YourLogic,
                     position_size = position_size * positions[0][0]
                 else:
                     position_size = position_avg_price = 0
-                # print(i,'Pos',position_avg_price,position_size)
+                # print(n,'Pos',position_avg_price,position_size)
             else:
                 remain[o_id] = o
 
         # ポジション情報保存
-        PositionSize[i] = position_size
+        PositionSize[n] = position_size
 
         # 残りの注文
         remaining_orders = remain
 
         # 合計損益
-        netprofit = netprofit + LongPL[i] + ShortPL[i]
+        netprofit = netprofit + LongPL[n] + ShortPL[n]
 
     # 残ポジションクローズ
     if len(positions):
-        position_size = sum(p[2]*p[0] for p in positions)
-        position_avg_price = sum(p[1] for p in positions)/len(positions)
+        position_size = math.fsum(p[2]*p[0] for p in positions)
+        position_avg_price = math.fsum(p[1]*p[2]*p[0] for p in positions)/position_size
         price = Close[N-1]
-        pnl = (position_avg_price - price) * position_size * -1
+        pnl = (price - position_avg_price) * position_size
         if position_size > 0:
             # print(N-1, 'Close', 1, position_avg_price, position_size, price, pnl)
-            LongPL[i] = pnl
-            LongTrade[i] = price
+            LongPL[N-1] = pnl
+            LongTrade[N-1] = price
         elif position_size < 0:
             # print(N-1, 'Close', -1, position_avg_price, position_size, price, pnl)
-            ShortPL[i] = pnl
-            ShortTrade[i] = price
+            ShortPL[N-1] = pnl
+            ShortTrade[N-1] = price
 
 
 def Backtest(ohlcv,
@@ -459,8 +490,8 @@ def Backtest(ohlcv,
     stop_buy_entry=None, stop_sell_entry=None, stop_buy_exit=None, stop_sell_exit=None,
     limit_buy_entry=None, limit_sell_entry=None, limit_buy_exit=None, limit_sell_exit=None,
     buy_size=1.0, sell_size=1.0, max_buy_size=1.0, max_sell_size=1.0,
-    spread=0, take_profit=0, stop_loss=0, trailing_stop=0, slippage=0, percent_of_equity=0.0, initial_capital=0.0, trades_per_second = 0, delay_n = 0,
-    max_drawdown=0, wait_seconds_for_mdd=0, yourlogic=None,
+    spread=0, take_profit=0, stop_loss=0, trailing_stop=0, slippage=0, percent_of_equity=0.0, initial_capital=0.0,
+    trades_per_second = 0, delay_n = 0, order_restrict_n = 0, max_drawdown=0, wait_seconds_for_mdd=0, yourlogic=None,
     **kwargs):
     Open = ohlcv.open.values #始値
     Low = ohlcv.low.values #安値
@@ -515,11 +546,11 @@ def Backtest(ohlcv,
     limit_sell_exit = place_holder if limit_sell_exit is None else limit_sell_exit.values
 
     # 約定数
-    Trades = place_holder
+    if 'trades' in ohlcv:
+        Trades = ohlcv.trades.values
+    else:
+        Trades = place_holder
     trades_per_n = trades_per_second * (ohlcv.index[1] - ohlcv.index[0]).total_seconds()
-    if trades_per_n:
-        if 'trades' in ohlcv:
-            Trades = ohlcv.trades.values
 
     # ドローダウン時の待ち時間
     wait_n_for_mdd = math.ceil(wait_seconds_for_mdd / (ohlcv.index[1] - ohlcv.index[0]).total_seconds())
@@ -537,8 +568,8 @@ def Backtest(ohlcv,
             stop_buy_entry, stop_sell_entry, stop_buy_exit, stop_sell_exit,
             limit_buy_entry, limit_sell_entry, limit_buy_exit, limit_sell_exit,
             buy_size, sell_size, max_buy_size, max_sell_size,
-            float(spread), float(take_profit), float(stop_loss), float(trailing_stop), float(slippage), float(percent), float(capital), int(trades_per_n), int(delay_n+1),
-            float(max_drawdown), int(wait_n_for_mdd),
+            float(spread), float(take_profit), float(stop_loss), float(trailing_stop), float(slippage), float(percent), float(capital),
+            int(trades_per_n), int(delay_n+1), int(order_restrict_n), float(max_drawdown), int(wait_n_for_mdd),
             LongTrade, LongPL, LongPct, ShortTrade, ShortPL, ShortPct, PositionSize)
 
     return BacktestReport(pd.DataFrame({
