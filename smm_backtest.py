@@ -6,42 +6,40 @@ from indicator import *
 
 def simple_market_make_backtest(ohlcv):
 
-    def smm_logic1(O, H, L, C, n, position_size, **others):
-        orders = []
+    def smm_logic1(O, H, L, C, n, strategy):
         maxsize = 0.1
         buysize = sellsize = 0.1
         spr = ohlcv.stdev[n]*2.5
         mid = (C+H+L)/3
         buy = mid - spr/2
         sell = mid + spr/2
-        if position_size < maxsize:
-            orders.append((+1, buy, buysize, 'L'))
+        if strategy.position_size < maxsize:
+            strategy.order('L', 'buy', qty=buysize, limit=buy)
         else:
-            orders.append((0, 0, 0, 'L'))
-        if position_size > -maxsize:
-            orders.append((-1, sell, sellsize, 'S'))
+            strategy.cancel('L')
+        if strategy.position_size > -maxsize:
+            strategy.order('S', 'sell', qty=sellsize, limit=sell)
         else:
-            orders.append((0, 0, 0, 'S'))
-        return orders
+            strategy.cancel('S')
 
-    def smm_logic2(O, H, L, C, n, position_size, **others):
+    def smm_logic2(O, H, L, C, n, strategy):
         orders = []
-        pairs = [(0.03, 200), (0.02, 100), (0.01, 50)]
+        pairs = [(0.04, 400, 3), (0.03, 200, 2), (0.02, 100, 1), (0.01, 50, 0)]
         maxsize = sum(p[0] for p in pairs)
-        buymax = sellmax = position_size
+        buymax = sellmax = strategy.position_size
         mid = (C+H+L)/3
         for pair in pairs:
-            suffix = str(pair[1])
-            buymax += pair[0]
-            sellmax -= pair[0]
-            if buymax <= maxsize:
-                orders.append((+1, mid-pair[1], pair[0], 'L'+suffix))
+            suffix = str(pair[2])
+            if buymax+pair[0] <= maxsize:
+                buymax += pair[0]
+                strategy.order('L'+suffix, 'buy', qty=pair[0], limit=mid-pair[1])
             else:
-                orders.append((0, 0, 0, 'L'+suffix))
-            if sellmax >= -maxsize:
-                orders.append((-1, mid+pair[1], pair[0], 'S'+suffix))
+                strategy.cancel('L'+suffix)
+            if sellmax-pair[0] >= -maxsize:
+                sellmax -= pair[0]
+                strategy.order('S'+suffix, 'sell', qty=pair[0], limit=mid+pair[1])
             else:
-                orders.append((0, 0, 0, 'S'+suffix))
+                strategy.cancel('S'+suffix)
         return orders
 
     # yourlogic = smm_logic1

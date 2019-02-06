@@ -86,14 +86,14 @@ def calclots(capital, price, percent, lot):
     else:
         return lot
 
-@jit(void(f8[:],f8[:],f8[:],f8[:],i8[:],i8,
+@jit(void(f8[:],f8[:],f8[:],f8[:],f8[:],i8[:],i8,
     b1[:],b1[:],b1[:],b1[:],
     f8[:],f8[:],f8[:],f8[:],
     f8[:],f8[:],f8[:],f8[:],
     f8[:],f8[:],f8,f8,
     f8,f8,f8,f8,f8,f8,f8,i8,i8,i8,f8,i8,
     f8[:],f8[:],f8[:],f8[:],f8[:],f8[:],f8[:]), nopython=True)
-def BacktestCore(Open, High, Low, Close, Trades, N,
+def BacktestCore(Open, High, Low, Close, Volume, Trades, N,
     buy_entry, sell_entry, buy_exit, sell_exit,
     stop_buy_entry, stop_sell_entry, stop_buy_exit, stop_sell_exit,
     limit_buy_entry, limit_sell_entry, limit_buy_exit, limit_sell_exit,
@@ -337,16 +337,29 @@ def BacktestCore(Open, High, Low, Close, Trades, N,
         ShortPL[N-1] = (sellExecPrice - ClosePrice) * sellExecLot #損益確定
         ShortPct[N-1] = ShortPL[N-1] / sellExecPrice
 
-
-def BacktestCore2(Open, High, Low, Close, Trades, N, YourLogic,
+def BacktestCore2(Open, High, Low, Close, Volume, Trades, N, YourLogic,
                   LongTrade, LongPL, LongPct, ShortTrade, ShortPL, ShortPct, PositionSize,
                   delay_n, trades_per_n):
+
+    class Strategy:
+        def __init__(self):
+            self.position_size = 0
+            self.position_avg_price = 0
+            self.netprofit = 0
+            self.orders = []
+
+        def order(self, myid, side, qty, limit = 0):
+            self.orders.append((-1 if side=='sell' else +1, limit, qty, myid))
+
+        def cancel(self, myid):
+            self.orders.append((0, 0, 0, myid))
 
     positions = deque()
     position_size = 0
     position_avg_price = 0
     netprofit = 0
     remaining_orders = {}
+    strategy = Strategy()
 
     for n in range(delay_n, N):
 
@@ -357,10 +370,16 @@ def BacktestCore2(Open, High, Low, Close, Trades, N, YourLogic,
         if not order_reject:
             prev_n = n-delay_n
             O, H, L, C = Open[prev_n], High[prev_n], Low[prev_n], Close[prev_n]
-            orders = YourLogic(O,H,L,C,prev_n,position_size=position_size,position_avg_price=position_avg_price,netprofit=netprofit)
+            # orders = YourLogic(O,H,L,C,prev_n,position_size=position_size,position_avg_price=position_avg_price,netprofit=netprofit)
+            strategy.orders = []
+            strategy.position_size = position_size
+            strategy.position_avg_price = position_avg_price
+            strategy.netprofit = netprofit
+            YourLogic(O,H,L,C,prev_n,strategy)
 
             # 注文受付
-            for o in orders:
+            for o in strategy.orders:
+            # for o in orders:
                 o_side, o_price, o_size, o_id = o
                 if o_size>0:
                     remaining_orders[o_id] = o
@@ -371,7 +390,7 @@ def BacktestCore2(Open, High, Low, Close, Trades, N, YourLogic,
                         del remaining_orders[o_id]
 
         # 現在の足で約定
-        O, H, L, C = Open[n], High[n], Low[n], Close[n]
+        O, H, L, C, V = Open[n], High[n], Low[n], Close[n], Volume[n]
 
         # 約定
         remain = {}
@@ -409,13 +428,15 @@ def BacktestCore2(Open, High, Low, Close, Trades, N, YourLogic,
                 elif market:
                     exec_price = O
 
-            if exec_price > 0:
+            if (exec_price > 0) and (V > o_size):
+                V = V - o_size
+
                 positions.append([o_side, exec_price, o_size])
-                # print(n, 'Exec', o_id, o_side, exec_price, o_size)
                 if o_side > 0:
                     LongTrade[n] = exec_price
                 else:
                     ShortTrade[n] = exec_price
+                # print(n, 'Exec', o_id, o_side, exec_price, o_size)
 
                 # 決済
                 while len(positions)>=2:
@@ -497,6 +518,7 @@ def Backtest(ohlcv,
     Low = ohlcv.low.values #安値
     High = ohlcv.high.values #高値
     Close = ohlcv.close.values #始値
+    Volume = ohlcv.volume.values #出来高
 
     N = len(ohlcv) #データサイズ
     buyExecPrice = sellExecPrice = 0.0 # 売買価格
@@ -559,11 +581,11 @@ def Backtest(ohlcv,
     capital = initial_capital
 
     if yourlogic:
-        BacktestCore2(Open.astype(float), High.astype(float), Low.astype(float), Close.astype(float), Trades.astype(int), N, yourlogic,
+        BacktestCore2(Open.astype(float), High.astype(float), Low.astype(float), Close.astype(float), Volume.astype(float), Trades.astype(int), N, yourlogic,
         LongTrade, LongPL, LongPct, ShortTrade, ShortPL, ShortPct, PositionSize,
         int(delay_n+1), int(trades_per_n))
     else:
-        BacktestCore(Open.astype(float), High.astype(float), Low.astype(float), Close.astype(float), Trades.astype(int), N,
+        BacktestCore(Open.astype(float), High.astype(float), Low.astype(float), Close.astype(float), Volume.astype(float), Trades.astype(int), N,
             buy_entry, sell_entry, buy_exit, sell_exit,
             stop_buy_entry, stop_sell_entry, stop_buy_exit, stop_sell_exit,
             limit_buy_entry, limit_sell_entry, limit_buy_exit, limit_sell_exit,
