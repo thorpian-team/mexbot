@@ -23,7 +23,6 @@ def simple_market_make_backtest(ohlcv):
             strategy.cancel('S')
 
     def smm_logic2(O, H, L, C, n, strategy):
-        orders = []
         pairs = [(0.04, 400, 3), (0.03, 200, 2), (0.02, 100, 1), (0.01, 50, 0)]
         maxsize = sum(p[0] for p in pairs)
         buymax = sellmax = strategy.position_size
@@ -40,7 +39,6 @@ def simple_market_make_backtest(ohlcv):
                 strategy.order('S'+suffix, 'sell', qty=pair[0], limit=mid+pair[1])
             else:
                 strategy.cancel('S'+suffix)
-        return orders
 
     # yourlogic = smm_logic1
     yourlogic = smm_logic2

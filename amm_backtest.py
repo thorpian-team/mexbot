@@ -21,29 +21,28 @@ def advanced_market_make_backtest(ohlcv):
     def ceilling(n,q=100):
         return int(ceil(n/q)*q)
 
-    def yourlogic(O,H,L,C,n,position_size,position_avg_price,**others):
+    def yourlogic(O,H,L,C,n,strategy):
         nonlocal buy_last
         nonlocal sell_last
-        orders = []
 
         if n<17:
-            return []
+            return
 
         maxsize = 0.05
         buysize = sellsize = 0.05
 
         if volma1[n]>100 or volma2[n]>100 or ohlcv.volume[n]>150:
-            orders.append((0, 0, 0, 'S'))
-            orders.append((0, 0, 0, 'L'))
+            strategy.cancel('S')
+            strategy.cancel('L')
             if volimb[n] > 1:
-                lot = min(maxsize - position_size, maxsize)
+                lot = min(maxsize - strategy.position_size, maxsize)
                 if lot > 0:
-                    orders.append((+1, 0, lot, 'Lf'))
+                    strategy.order('Lf', 'buy', qty=lot)
             elif volimb[n] < -1:
-                lot = min(maxsize + position_size, maxsize)
+                lot = min(maxsize + strategy.position_size, maxsize)
                 if lot > 0:
-                    orders.append((-1, 0, lot, 'Sf'))
-            return orders
+                    strategy.order('Sf', 'sell', qty=lot)
+            return
 
         spr = max(dev[n],110)
         buy = C-spr
@@ -52,32 +51,29 @@ def advanced_market_make_backtest(ohlcv):
         sell = ceilling(sell)
 
         risk = 0.333
-        if position_size>0:
+        if strategy.position_size>0:
             buy = buy - spr*risk
             sell = sell - spr*risk
             buy = flooring(buy)
             sell = ceilling(sell)
-            if (C-position_avg_price)>spr*(1-risk):
+            if (C-strategy.position_avg_price)>spr*(1-risk):
                 sell = C
-        elif position_size<0:
+        elif strategy.position_size<0:
             buy = buy + spr*risk
             sell = sell + spr*risk
             buy = flooring(buy)
             sell = ceilling(sell)
-            if (position_avg_price-C)>spr*(1-risk):
+            if (strategy.position_avg_price-C)>spr*(1-risk):
                 buy = C
 
         maxlots=1
-        if position_size < maxsize and abs(buy_last-buy)>spr*0.111:
-            orders.append((+1, buy, buysize/maxlots, 'L'+str(n%maxlots)))
+        if strategy.position_size < maxsize and abs(buy_last-buy)>spr*0.111:
+            strategy.order('L'+str(n%maxlots), 'buy', qty=buysize/maxlots, limit=buy)
             buy_last = buy
 
-        if position_size > -maxsize and abs(sell_last-sell)>spr*0.111:
-            orders.append((-1, sell, sellsize/maxlots, 'S'+str(n%maxlots)))
+        if strategy.position_size > -maxsize and abs(sell_last-sell)>spr*0.111:
+            strategy.order('S'+str(n%maxlots), 'sell', qty=sellsize/maxlots, limit=sell)
             sell_last = sell
-
-        return orders
-
 
     return Backtest(**locals())
 
