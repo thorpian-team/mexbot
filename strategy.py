@@ -433,7 +433,7 @@ class Strategy:
         self.logger.info('{symbol}: type:{type}'.format(**market))
 
     def add_arguments(self, parser):
-        parser.add_argument('--apiKey', type=str, default=self.settings.apiKey)
+        parser.add_argument('--apikey', type=str, default=self.settings.apiKey)
         parser.add_argument('--secret', type=str, default=self.settings.secret)
         parser.add_argument('--symbol', type=str, default=self.settings.symbol)
         parser.add_argument('--timeframe', type=str, default=self.settings.timeframe)
@@ -443,6 +443,8 @@ class Strategy:
     def start(self, args=None):
 
         if args is not None:
+            self.settings.apiKey = args.apikey
+            self.settings.secret = args.secret
             self.settings.symbol = args.symbol
             self.settings.timeframe = args.timeframe
             self.settings.interval = args.interval
