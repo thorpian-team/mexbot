@@ -150,7 +150,7 @@ def BacktestCore(Open, High, Low, Close, Volume, Trades, N,
                 OpenPrice = Open[n]
                 buyMarketEntry = 0
             # 注文執行
-            if OpenPrice > 0:
+            if OpenPrice > 0 and Volume[n]>buyOpenSize:
                 execPrice = OpenPrice + spread + slippage
                 LongTrade[n] = execPrice #買いポジションオープン
                 execLot =  calclots(capital, OpenPrice, percent, buyOpenSize)
@@ -186,7 +186,7 @@ def BacktestCore(Open, High, Low, Close, Volume, Trades, N,
                 ClosePrice = Open[n]
                 buyMarketExit = 0
             # 注文執行
-            if ClosePrice > 0:
+            if ClosePrice > 0 and Volume[n]>buyCloseSize:
                 if buyExecLot > buyCloseSize:
                     buy_exit_lot = buyCloseSize
                     buy_exec_price = buyExecPrice
@@ -228,7 +228,7 @@ def BacktestCore(Open, High, Low, Close, Volume, Trades, N,
                 OpenPrice = Open[n]
                 sellMarketEntry = 0
             # 注文執行
-            if OpenPrice:
+            if OpenPrice and Volume[n]>sellOpenSize:
                 execPrice = OpenPrice - slippage
                 ShortTrade[n] = execPrice #売りポジションオープン
                 execLot = calclots(capital,OpenPrice,percent,sellOpenSize)
@@ -264,7 +264,7 @@ def BacktestCore(Open, High, Low, Close, Volume, Trades, N,
                 ClosePrice = Open[n]
                 sellMarketExit = 0
             # 注文執行
-            if ClosePrice > 0:
+            if ClosePrice > 0 and Volume[n]>sellCloseSize:
                 if sellExecLot > sellCloseSize:
                     sell_exit_lot = sellCloseSize
                     sell_exec_price = sellExecPrice
@@ -291,7 +291,7 @@ def BacktestCore(Open, High, Low, Close, Volume, Trades, N,
                 LimitPrice = buyExecPrice + take_profit
                 if High[n] >= LimitPrice:
                     ClosePrice = Close[n]
-            if ClosePrice > 0:
+            if ClosePrice > 0 and Volume[n]>buyExecLot:
                 ClosePrice = ClosePrice - slippage
                 LongTrade[n] = ClosePrice #買いポジションクローズ
                 LongPL[n] = (ClosePrice - buyExecPrice) * buyExecLot #損益確定
@@ -310,7 +310,7 @@ def BacktestCore(Open, High, Low, Close, Volume, Trades, N,
                 LimitPrice = sellExecPrice - take_profit
                 if Low[n] <= LimitPrice:
                     ClosePrice = Close[n]
-            if ClosePrice > 0:
+            if ClosePrice > 0 and Volume[n]>sellExecLot:
                 ClosePrice = ClosePrice + slippage
                 ShortTrade[n] = ClosePrice #売りポジションクローズ
                 ShortPL[n] = (sellExecPrice - ClosePrice) * sellExecLot #損益確定
