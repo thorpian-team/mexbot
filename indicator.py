@@ -435,6 +435,15 @@ def hlc3(ohlcv):
 def ohlc4(ohlcv):
     return (ohlcv.open+ohlcv.high+ohlcv.low+ohlcv.close)/4
 
+def mfi(ohlcv, period):
+    tp = (ohlcv.high+ohlcv.low+ohlcv.close)/3
+    mf = tp * ohlcv.volume
+    df = mf.diff()
+    pmf = df.clip_lower(0).rolling(period).sum()
+    mmf = df.clip_upper(0).rolling(period).sum().abs()
+    mr = pmf/mmf
+    return 100-(100/(1+mr))
+
 if __name__ == '__main__':
 
     from utils import stop_watch
@@ -446,7 +455,7 @@ if __name__ == '__main__':
     # gwalk = np.cumprod(np.exp(scale*dn))*p0
     # data = pd.Series(gwalk)
 
-    ohlc = pd.read_csv('csv/bitmex_2018_1h.csv', index_col='timestamp', parse_dates=True)
+    ohlc = pd.read_csv('csv/bitmex_2019_5m.csv', index_col='timestamp', parse_dates=True)
 
     fastsma = stop_watch(fastsma)
     sma = stop_watch(sma)
@@ -473,7 +482,8 @@ if __name__ == '__main__':
     rci = stop_watch(rci)
     fastrci = stop_watch(fastrci)
     polyfline = stop_watch(polyfline)
-    corr = stop_watch(corr)
+    corr = stop_watch(correlation)
+    mfi = stop_watch(mfi)
 
     vfastsma = fastsma(ohlc.close, 10)
     vsma = sma(ohlc.close, 10)
@@ -501,6 +511,7 @@ if __name__ == '__main__':
     vfastrci = fastrci(ohlc.open, 14)
     vply = polyfline(ohlc.open, 14)
     vcorr = corr(ohlc.close, ohlc.volume, 14)
+    vmfi = mfi(ohlc, 14)
     df = pd.DataFrame({
         'high':ohlc.high,
         'low':ohlc.low,
@@ -536,5 +547,6 @@ if __name__ == '__main__':
         'fastrci':vfastrci,
         'polyfit':vply,
         'corr':vcorr,
+        'mfi':vmfi,
         }, index=ohlc.index)
     print(df.to_csv())
