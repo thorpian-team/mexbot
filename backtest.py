@@ -370,7 +370,6 @@ def BacktestCore2(Open, High, Low, Close, Volume, Trades, N, YourLogic,
         if not order_reject:
             prev_n = n-delay_n
             O, H, L, C = Open[prev_n], High[prev_n], Low[prev_n], Close[prev_n]
-            # orders = YourLogic(O,H,L,C,prev_n,position_size=position_size,position_avg_price=position_avg_price,netprofit=netprofit)
             strategy.orders = []
             strategy.position_size = position_size
             strategy.position_avg_price = position_avg_price
@@ -396,41 +395,22 @@ def BacktestCore2(Open, High, Low, Close, Volume, Trades, N, YourLogic,
         remain = {}
         for k,o in remaining_orders.items():
             o_side, o_price, o_size, o_id = o
-
             exec_price = 0
-            market = o_price==0
-            limit = o_price
-            stop = 0
-            if o_side > 0:
-                # STOP注文
-                if stop > 0 and H >= stop:
-                    if stop >= O:
-                        exec_price = stop
-                    else:
-                        exec_price = O
-                # 指値注文
-                elif limit > 0 and L <= limit:
-                    exec_price = limit
-                # 成行注文
-                elif market:
-                    exec_price = O
-            elif o_side < 0:
-                # STOP注文
-                if stop > 0 and L <= stop:
-                    if stop <= O:
-                        exec_price = stop
-                    else:
-                        exec_price = O
-                # 指値注文
-                elif limit > 0 and H >= limit:
-                    exec_price = limit
-                # 成行注文
-                elif market:
-                    exec_price = O
 
-            if (exec_price > 0) and (V > o_size):
-                V = V - o_size
+            # 指値注文
+            if o_price > 0:
+                if o_side > 0:
+                    if L < o_price:
+                        exec_price = o_price
+                elif o_side < 0:
+                    # 指値注文
+                    if H > o_price:
+                        exec_price = o_price
+            else:
+                # 成行注文
+                exec_price = O
 
+            if exec_price > 0:
                 positions.append([o_side, exec_price, o_size])
                 if o_side > 0:
                     LongTrade[n] = exec_price
@@ -458,11 +438,9 @@ def BacktestCore2(Open, High, Low, Close, Volume, Trades, N, YourLogic,
                         # print(n, 'Close', l_side, l_price, c_size, r_price, pnl)
                         if l_side > 0:
                             LongPL[n] = LongPL[n] + pnl
-                            # LongTrade[n] = r_price
                             LongPct[n] = LongPL[n] / r_price
                         else:
                             ShortPL[n] = ShortPL[n] + pnl
-                            # ShortTrade[n] = r_price
                             ShortPct[n] = ShortPL[n] / r_price
                     else:
                         positions.appendleft((l_side,l_price,l_size))
@@ -769,14 +747,14 @@ def BacktestIteration(testfunc, default_parameters, hyperopt_parameters, max_eva
         params = default_parameters.copy()
         params.update(args)
         report = testfunc(**params)
-        if 'ohlcv' in params:
-            del params['ohlcv']
-        if 'ticks' in params:
-            del params['ticks']
-        params.update(report.All)
+        result = {}
+        for k,v in params.items():
+            if not isinstance(v, pd.DataFrame):
+                result[k] = v
+        result.update(report.All)
         if needs_header[0]:
-            print(','.join(params.keys()))
-        print(','.join([str(x) for x in params.values()]))
+            print(','.join(result.keys()))
+        print(','.join([str(x) for x in result.values()]))
         needs_header[0] = False
         return report
 
