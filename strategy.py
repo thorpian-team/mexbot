@@ -197,8 +197,6 @@ class Strategy:
         try:
             order = dotdict(self.exchange.fetch_order(order_id))
             order.info = dotdict(order.info)
-        except ccxt.NotFound as e:
-            self.logger.warning(type(e).__name__ + ": {0}".format(e))
         except ccxt.OrderNotFound as e:
             self.logger.warning(type(e).__name__ + ": {0}".format(e))
         return order
@@ -230,8 +228,6 @@ class Strategy:
                 res = self.exchange.cancel_order(order_id)
                 self.logger.info("CANCEL: {orderID} {side} {orderQty} {price}".format(**res['info']))
             except ccxt.OrderNotFound as e:
-                self.logger.warning(type(e).__name__ + ": {0}".format(e))
-            except ccxt.NotFound as e:
                 self.logger.warning(type(e).__name__ + ": {0}".format(e))
             del self.orders[myid]
 
