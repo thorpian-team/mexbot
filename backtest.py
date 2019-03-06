@@ -370,10 +370,7 @@ def BacktestCore2(Open, High, Low, Close, Volume, Trades, N, YourLogic,
         if not order_reject:
             prev_n = n-delay_n
             O, H, L, C = Open[prev_n], High[prev_n], Low[prev_n], Close[prev_n]
-            strategy.position_size = position_size
-            strategy.position_avg_price = position_avg_price
-            strategy.netprofit = netprofit
-            strategy.orders = {}
+            strategy.position_size, strategy.position_avg_price, strategy.netprofit, strategy.orders = position_size, position_avg_price, netprofit, {}
             YourLogic(O,H,L,C,prev_n,strategy)
 
             # 新規注文受付
@@ -396,7 +393,7 @@ def BacktestCore2(Open, High, Low, Close, Volume, Trades, N, YourLogic,
             # 約定した注文を削除
             del remaining_orders[o_id]
 
-            positions.append([o_side, exec_price, o_size])
+            positions.append((o_side, exec_price, o_size))
             if o_side > 0:
                 LongTrade[n] = exec_price
             else:
@@ -405,22 +402,21 @@ def BacktestCore2(Open, High, Low, Close, Volume, Trades, N, YourLogic,
 
             # 決済
             while len(positions)>=2:
-                l_side, l_price, l_size = positions.popleft()
-                r_side, r_price, r_size = positions.pop()
-                if l_side != r_side:
+                if positions[0][0] != positions[-1][0]:
+                    l_side, l_price, l_size = positions.popleft()
+                    r_side, r_price, r_size = positions.pop()
                     if l_size >= r_size:
                         pnl = (r_price - l_price) * (r_size * l_side)
-                        c_size = r_size
                         l_size = round(l_size-r_size,8)
                         if l_size > 0:
                             positions.appendleft((l_side,l_price,l_size))
+                        # print(n, 'Close', l_side, l_price, r_size, r_price, pnl)
                     else:
                         pnl = (r_price - l_price) * (l_size * l_side)
-                        c_size = l_size
                         r_size = round(r_size-l_size,8)
                         if r_size > 0:
                             positions.append((r_side,r_price,r_size))
-                    # print(n, 'Close', l_side, l_price, c_size, r_price, pnl)
+                        # print(n, 'Close', l_side, l_price, l_size, r_price, pnl)
                     if l_side > 0:
                         LongPL[n] = LongPL[n] + pnl
                         LongPct[n] = LongPL[n] / r_price
@@ -428,19 +424,16 @@ def BacktestCore2(Open, High, Low, Close, Volume, Trades, N, YourLogic,
                         ShortPL[n] = ShortPL[n] + pnl
                         ShortPct[n] = ShortPL[n] / r_price
                 else:
-                    positions.appendleft((l_side,l_price,l_size))
-                    positions.append((r_side,r_price,r_size))
                     break
 
-            # ポジションサイズ計算
-            pos = len(positions)
-            if pos:
-                position_size = math.fsum(p[2] for p in positions)
-                position_avg_price = math.fsum(p[1]*p[2] for p in positions) / position_size
-                position_size = position_size * positions[0][0]
-            else:
-                position_size = position_avg_price = 0
-            # print(n,'Pos',position_avg_price,position_size)
+        # ポジションサイズ計算
+        if len(positions):
+            position_size = math.fsum(p[2] for p in positions)
+            position_avg_price = math.fsum(p[1]*p[2] for p in positions) / position_size
+            position_size = position_size * positions[0][0]
+        else:
+            position_size = position_avg_price = 0
+        # print(n,'Pos',position_avg_price,position_size)
 
         # ポジション情報保存
         PositionSize[n] = position_size
