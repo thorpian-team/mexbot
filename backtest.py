@@ -346,13 +346,13 @@ def BacktestCore2(Open, High, Low, Close, Volume, Trades, N, YourLogic,
             self.position_size = 0
             self.position_avg_price = 0
             self.netprofit = 0
-            self.orders = []
+            self.orders = {}
 
         def order(self, myid, side, qty, limit = 0):
-            self.orders.append((-1 if side=='sell' else +1, limit, qty, myid))
+            self.orders[myid] = (-1 if side=='sell' else +1, limit, qty, myid)
 
         def cancel(self, myid):
-            self.orders.append((0, 0, 0, myid))
+            self.orders[myid] = (0, 0, 0, myid)
 
     positions = deque()
     position_size = 0
@@ -370,100 +370,80 @@ def BacktestCore2(Open, High, Low, Close, Volume, Trades, N, YourLogic,
         if not order_reject:
             prev_n = n-delay_n
             O, H, L, C = Open[prev_n], High[prev_n], Low[prev_n], Close[prev_n]
-            strategy.orders = []
             strategy.position_size = position_size
             strategy.position_avg_price = position_avg_price
             strategy.netprofit = netprofit
+            strategy.orders = {}
             YourLogic(O,H,L,C,prev_n,strategy)
 
-            # 注文受付
-            for o in strategy.orders:
-            # for o in orders:
-                o_side, o_price, o_size, o_id = o
-                if o_size>0:
-                    remaining_orders[o_id] = o
-                    # print(n, 'Open', o_id, o_side, o_price, o_size)
-                else:
-                    if o_id in remaining_orders:
-                        # print(n, 'Cancel', o_id)
-                        del remaining_orders[o_id]
+            # 新規注文受付
+            remaining_orders.update(strategy.orders)
+
+            # サイズ0の注文はキャンセル扱い
+            remaining_orders = {k:v for k,v in remaining_orders.items() if v[2]>0}
 
         # 現在の足で約定
         O, H, L, C, V = Open[n], High[n], Low[n], Close[n], Volume[n]
 
-        # 約定
-        remain = {}
-        for k,o in remaining_orders.items():
-            o_side, o_price, o_size, o_id = o
-            exec_price = 0
+        # 約定判定（成行と指値のみ対応）
+        executions = [o for o in remaining_orders.values() if (o[1]==0) or (o[1]>0 and o[0]<0 and H>o[1]) or (o[1]>0 and o[0]>0 and L<o[1])]
 
-            # 指値注文
-            if o_price > 0:
-                if o_side > 0:
-                    if L < o_price:
-                        exec_price = o_price
-                elif o_side < 0:
-                    # 指値注文
-                    if H > o_price:
-                        exec_price = o_price
+        # 約定処理
+        for e in executions:
+            o_side, exec_price, o_size, o_id = e
+            exec_price = exec_price if exec_price>0 else O
+
+            # 約定した注文を削除
+            del remaining_orders[o_id]
+
+            positions.append([o_side, exec_price, o_size])
+            if o_side > 0:
+                LongTrade[n] = exec_price
             else:
-                # 成行注文
-                exec_price = O
+                ShortTrade[n] = exec_price
+            # print(n, 'Exec', o_id, o_side, exec_price, o_size)
 
-            if exec_price > 0:
-                positions.append([o_side, exec_price, o_size])
-                if o_side > 0:
-                    LongTrade[n] = exec_price
-                else:
-                    ShortTrade[n] = exec_price
-                # print(n, 'Exec', o_id, o_side, exec_price, o_size)
-
-                # 決済
-                while len(positions)>=2:
-                    l_side, l_price, l_size = positions.popleft()
-                    r_side, r_price, r_size = positions.pop()
-                    if l_side != r_side:
-                        if l_size >= r_size:
-                            pnl = (r_price - l_price) * (r_size * l_side)
-                            c_size = r_size
-                            l_size = round(l_size-r_size,8)
-                            if l_size > 0:
-                                positions.appendleft((l_side,l_price,l_size))
-                        else:
-                            pnl = (r_price - l_price) * (l_size * l_side)
-                            c_size = l_size
-                            r_size = round(r_size-l_size,8)
-                            if r_size > 0:
-                                positions.append((r_side,r_price,r_size))
-                        # print(n, 'Close', l_side, l_price, c_size, r_price, pnl)
-                        if l_side > 0:
-                            LongPL[n] = LongPL[n] + pnl
-                            LongPct[n] = LongPL[n] / r_price
-                        else:
-                            ShortPL[n] = ShortPL[n] + pnl
-                            ShortPct[n] = ShortPL[n] / r_price
+            # 決済
+            while len(positions)>=2:
+                l_side, l_price, l_size = positions.popleft()
+                r_side, r_price, r_size = positions.pop()
+                if l_side != r_side:
+                    if l_size >= r_size:
+                        pnl = (r_price - l_price) * (r_size * l_side)
+                        c_size = r_size
+                        l_size = round(l_size-r_size,8)
+                        if l_size > 0:
+                            positions.appendleft((l_side,l_price,l_size))
                     else:
-                        positions.appendleft((l_side,l_price,l_size))
-                        positions.append((r_side,r_price,r_size))
-                        break
-
-                # ポジションサイズ計算
-                pos = len(positions)
-                if pos:
-                    position_size = math.fsum(p[2] for p in positions)
-                    position_avg_price = math.fsum(p[1]*p[2] for p in positions) / position_size
-                    position_size = position_size * positions[0][0]
+                        pnl = (r_price - l_price) * (l_size * l_side)
+                        c_size = l_size
+                        r_size = round(r_size-l_size,8)
+                        if r_size > 0:
+                            positions.append((r_side,r_price,r_size))
+                    # print(n, 'Close', l_side, l_price, c_size, r_price, pnl)
+                    if l_side > 0:
+                        LongPL[n] = LongPL[n] + pnl
+                        LongPct[n] = LongPL[n] / r_price
+                    else:
+                        ShortPL[n] = ShortPL[n] + pnl
+                        ShortPct[n] = ShortPL[n] / r_price
                 else:
-                    position_size = position_avg_price = 0
-                # print(n,'Pos',position_avg_price,position_size)
+                    positions.appendleft((l_side,l_price,l_size))
+                    positions.append((r_side,r_price,r_size))
+                    break
+
+            # ポジションサイズ計算
+            pos = len(positions)
+            if pos:
+                position_size = math.fsum(p[2] for p in positions)
+                position_avg_price = math.fsum(p[1]*p[2] for p in positions) / position_size
+                position_size = position_size * positions[0][0]
             else:
-                remain[o_id] = o
+                position_size = position_avg_price = 0
+            # print(n,'Pos',position_avg_price,position_size)
 
         # ポジション情報保存
         PositionSize[n] = position_size
-
-        # 残りの注文
-        remaining_orders = remain
 
         # 合計損益
         netprofit = netprofit + LongPL[n] + ShortPL[n]
