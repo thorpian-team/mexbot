@@ -359,31 +359,26 @@ def BacktestCore2(Open, High, Low, Close, Volume, Trades, N, YourLogic,
     position_avg_price = 0
     netprofit = 0
     remaining_orders = {}
+    new_orders = []
     strategy = Strategy()
 
-    for n in range(delay_n, N):
+    # 約定数が規定値を超えていたら注文拒否
+    order_reject = Trades > trades_per_n if trades_per_n>0 else np.zeros(N)
 
-        # 約定数が規定値を超えていたら注文拒否
-        order_reject = trades_per_n and Trades[n] > trades_per_n
+    for n in range(0, N):
 
-        # 1つ前の足で注文作成
-        if not order_reject:
-            prev_n = n-delay_n
-            O, H, L, C = Open[prev_n], High[prev_n], Low[prev_n], Close[prev_n]
-            strategy.position_size, strategy.position_avg_price, strategy.netprofit, strategy.orders = position_size, position_avg_price, netprofit, {}
-            YourLogic(O,H,L,C,prev_n,strategy)
-
-            # 新規注文受付
-            remaining_orders.update(strategy.orders)
-
-            # サイズ0の注文はキャンセル扱い
-            remaining_orders = {k:v for k,v in remaining_orders.items() if v[2]>0}
-
-        # 現在の足で約定
+        # OHLCV取得
         O, H, L, C, V = Open[n], High[n], Low[n], Close[n], Volume[n]
 
-        # 約定判定（成行と指値のみ対応）
-        executions = [o for o in remaining_orders.values() if (o[1]==0) or (o[1]>0 and o[0]<0 and H>o[1]) or (o[1]>0 and o[0]>0 and L<o[1])]
+        # 新規注文受付
+        for o in new_orders:
+            remaining_orders.update(o)
+        new_orders = []
+        # サイズ0の注文はキャンセル
+        remaining_orders = {k:v for k,v in remaining_orders.items() if v[2]>0}
+
+        # 約定判定（成行と指値のみ対応/現在の足で約定）
+        executions = [o for o in remaining_orders.values() if (o[1]==0) or (o[1]>0 and ((o[0]<0 and H>o[1]) or (o[0]>0 and L<o[1])))]
 
         # 約定処理
         for e in executions:
@@ -393,11 +388,14 @@ def BacktestCore2(Open, High, Low, Close, Volume, Trades, N, YourLogic,
             # 約定した注文を削除
             del remaining_orders[o_id]
 
-            positions.append((o_side, exec_price, o_size))
+            # 注文情報保存
             if o_side > 0:
                 LongTrade[n] = exec_price
             else:
                 ShortTrade[n] = exec_price
+
+            # ポジション追加
+            positions.append((o_side, exec_price, o_size))
             # print(n, 'Exec', o_id, o_side, exec_price, o_size)
 
             # 決済
@@ -417,6 +415,7 @@ def BacktestCore2(Open, High, Low, Close, Volume, Trades, N, YourLogic,
                         if r_size > 0:
                             positions.append((r_side,r_price,r_size))
                         # print(n, 'Close', l_side, l_price, l_size, r_price, pnl)
+                    # 決済情報保存
                     if l_side > 0:
                         LongPL[n] = LongPL[n] + pnl
                         LongPct[n] = LongPL[n] / r_price
@@ -440,6 +439,12 @@ def BacktestCore2(Open, High, Low, Close, Volume, Trades, N, YourLogic,
 
         # 合計損益
         netprofit = netprofit + LongPL[n] + ShortPL[n]
+
+        # 注文作成
+        if not order_reject[n]:
+            strategy.position_size, strategy.position_avg_price, strategy.netprofit, strategy.orders = position_size, position_avg_price, netprofit, {}
+            YourLogic(O,H,L,C,n,strategy)
+            new_orders.append(strategy.orders)
 
     # 残ポジションクローズ
     if len(positions):
@@ -532,9 +537,16 @@ def Backtest(ohlcv,
     capital = initial_capital
 
     if yourlogic:
+        # import line_profiler
+        # lp = line_profiler.LineProfiler()
+        # lp.add_function(BacktestCore2)
+        # lp.add_function(yourlogic)
+        # lp.enable()
         BacktestCore2(Open.astype(float), High.astype(float), Low.astype(float), Close.astype(float), Volume.astype(float), Trades.astype(int), N, yourlogic,
         LongTrade, LongPL, LongPct, ShortTrade, ShortPL, ShortPct, PositionSize,
         int(delay_n+1), int(trades_per_n))
+        # lp.disable()
+        # lp.print_stats()
     else:
         BacktestCore(Open.astype(float), High.astype(float), Low.astype(float), Close.astype(float), Volume.astype(float), Trades.astype(int), N,
             buy_entry, sell_entry, buy_exit, sell_exit,
