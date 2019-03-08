@@ -343,9 +343,11 @@ def BacktestCore2(Open, High, Low, Close, Volume, Trades, N, YourLogic,
 
     class Strategy:
         def __init__(self):
+            self.positions = None
             self.position_size = 0
             self.position_avg_price = 0
             self.netprofit = 0
+            self.open_orders = None
             self.orders = {}
 
         def order(self, myid, side, qty, limit = 0):
@@ -442,7 +444,8 @@ def BacktestCore2(Open, High, Low, Close, Volume, Trades, N, YourLogic,
 
         # 注文作成
         if not order_reject[n]:
-            strategy.position_size, strategy.position_avg_price, strategy.netprofit, strategy.orders = position_size, position_avg_price, netprofit, {}
+            strategy.positions, strategy.position_size, strategy.position_avg_price, strategy.netprofit, strategy.open_orders, strategy.orders = \
+                positions, position_size, position_avg_price, netprofit, remaining_orders, {}
             YourLogic(O,H,L,C,n,strategy)
             new_orders.append(strategy.orders)
 
